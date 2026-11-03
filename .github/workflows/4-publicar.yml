@@ -1,13 +1,17 @@
 name: 4. Publicar en Now Football
 
-# Publica de verdad. Corre solo cada 2 horas de 6am a 10pm (hora de Mazatlán).
-# El botón es por si quieres publicar algo de inmediato.
+# El bot despierta 8 veces al día, pero NO publica en todas: el código reparte
+# el cupo del día entre los turnos que quedan, se salta algunos a propósito y
+# desordena la hora. Eso es lo que evita que se vea como un reloj.
+#
+# Con el modo revisión activado, cada corrida deja un post PROGRAMADO en
+# Facebook para ~24 h después, no lo publica de inmediato.
 
 on:
   schedule:
-    #   13 UTC = 6am    15 = 8am    17 = 10am   19 = 12pm   21 = 2pm
-    #   23 UTC = 4pm     1 = 6pm     3 = 8pm     5 = 10pm
-    - cron: '0 1,3,5,13,15,17,19,21,23 * * *'
+    # Horas de Mazatlán (UTC−7): 8am 10am 12pm 2pm 4pm 6pm 8pm 10pm
+    #                      UTC:   15   17    19   21   23   01   03   05
+    - cron: '0 1,3,5,15,17,19,21,23 * * *'
   workflow_dispatch:
 
 permissions:
@@ -28,7 +32,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
 
-      - name: Elegir la mejor imagen y publicarla
+      - name: Elegir la mejor imagen y programarla
         env:
           FB_PAGE_ID:    ${{ secrets.FB_PAGE_ID }}
           FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
