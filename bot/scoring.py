@@ -33,12 +33,31 @@ def tasa(tweet, now=None):
     return tweet.get("retweets", 0) / horas
 
 
-def baselines(queue, now=None):
-    """Tasa típica (mediana) de cada cuenta, con lo que haya en la cola."""
+def baselines(queue, now=None, horas_max=None):
+    """Tasa típica (mediana) de cada cuenta.
+
+    IMPORTANTE: se mide sobre el mismo tramo de edad para todas las cuentas.
+    Si se tomara la cola completa, una cuenta que publica despacio tendría su
+    cola llena de tweets viejos (de tasa baja por definición, porque la tasa
+    es reposts entre horas), su mediana se hundiría y cualquier cosa que
+    publicara saldría inflada frente a una cuenta que publica seguido.
+    """
+    horas_max = horas_max or max(config.VENTANAS_HORAS)
     buckets = {}
     for t in queue.values():
-        buckets.setdefault(t["author"], []).append(tasa(t, now))
-    return {a: max(statistics.median(v), 0.5) for a, v in buckets.items() if v}
+        if age_hours(t, now) <= horas_max:
+            buckets.setdefault(t["author"], []).append(tasa(t, now))
+
+    # Si una cuenta casi no publicó en ese tramo, la mediana sería ruido.
+    # En ese caso se usa la mediana general como referencia.
+    todas = [v for lista in buckets.values() for v in lista]
+    general = max(statistics.median(todas), 0.5) if todas else 1.0
+
+    salida = {}
+    for autor, valores in buckets.items():
+        salida[autor] = (max(statistics.median(valores), 0.5)
+                         if len(valores) >= config.MIN_MUESTRA_BASE else general)
+    return salida
 
 
 def score(tweet, base, now=None):

@@ -55,6 +55,7 @@ def run(dry_run=False, ahora=None, rng=None):
     bloqueados = _cargar_bloqueados()
     rng = rng or random
     ahora = ahora or dt.datetime.now(dt.timezone.utc)
+    sin_datos_frescos = False
 
     # ---------- Frenos de ritmo (no aplican a la prueba sin publicar)
     if not dry_run:
@@ -75,11 +76,11 @@ def run(dry_run=False, ahora=None, rng=None):
         store.save_queue(queue)
         if errores:
             fallidas = ", ".join("@" + c for c, _ in errores)
-            print(f"  [!] No respondieron: {fallidas}. Se sigue con las demás.")
-            if len(errores) == len(config.ACCOUNTS):
-                print("Ninguna cuenta respondió. No se publica nada en esta corrida.",
-                      file=sys.stderr)
-                return 1
+            print(f"  [!] No respondieron: {fallidas}")
+        sin_datos_frescos = len(errores) == len(config.ACCOUNTS)
+        if sin_datos_frescos:
+            print("  [!] Ninguna cuenta de X respondió. Se intenta con lo que ya")
+            print("      estaba guardado, que puede tener los números algo atrasados.")
         print(f"  {nuevos} publicaciones nuevas · {len(queue)} en total\n")
 
     # ---------- Elegir candidato: ventana más reciente que tenga algo
@@ -88,6 +89,9 @@ def run(dry_run=False, ahora=None, rng=None):
         print(f"Nada publicable en las últimas {config.VENTANAS_HORAS[-1]} horas.")
         print("Puede ser que las cuentas no hayan publicado imágenes nuevas,")
         print("o que todo lo reciente ya se haya publicado antes.")
+        if sin_datos_frescos:
+            print("\nOJO: además X no respondió en esta corrida.", file=sys.stderr)
+            return 1
         return 0
     print(f"Ventana usada: últimas {ventana} h · {len(ranking)} candidatos")
     if ventana != config.VENTANAS_HORAS[0]:

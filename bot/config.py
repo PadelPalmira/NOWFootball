@@ -25,7 +25,7 @@ FB_API_VERSION = os.environ.get("FB_API_VERSION", "v23.0")
 # ventana para cancelarlo en Meta Business Suite si algo no te cuadra.
 # Facebook exige un mínimo de 10 minutos para programar.
 # Pon (0, 0) si prefieres que salga al instante.
-RETRASO_MINUTOS = (12, 30)
+RETRASO_MINUTOS = (15, 35)
 
 # Que el botón "3. Probar sin publicar" también consulte X en vivo, para que
 # la vista previa sea de verdad lo que saldría.
@@ -66,6 +66,10 @@ QUEUE_HARD_LIMIT   = 400    # tope de la cola para que el JSON no crezca sin con
 # ventana no hay nada que sirva (o todo ya se publicó), se abre a 4 horas,
 # luego a 8, y así. La primera ventana que tenga algo, gana.
 VENTANAS_HORAS = [2, 4, 8, 24]
+
+# Cuántos tweets necesita una cuenta en el tramo de referencia para que su
+# mediana signifique algo. Con menos, se usa la mediana general.
+MIN_MUESTRA_BASE = 3
 
 # Un tweet de 10 minutos con 200 reposts está explotando más que uno de 2 horas
 # con 300, así que se mide la TASA (reposts por hora), no el total. Este piso de
