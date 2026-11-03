@@ -5,11 +5,49 @@ así que cada dato se busca en varias rutas posibles antes de rendirse.
 """
 import datetime as dt
 import html
+import random
+import time
+
 import requests
 
 from . import config
 
 BASE = "https://api.twitterapi.io"
+
+# twitterapi.io limita cuántas peticiones seguidas acepta. Si se le piden las
+# tres cuentas de golpe contesta 429 ("demasiadas peticiones"), así que aquí se
+# espacian las llamadas y se reintenta con esperas cada vez más largas.
+PAUSA_ENTRE_LLAMADAS = 2.0          # segundos mínimos entre una petición y la siguiente
+INTENTOS = 4
+REINTENTABLES = (429, 500, 502, 503, 504)
+
+_ultima_llamada = [0.0]
+
+
+def _pedir(url, params, headers, timeout=45):
+    espera = 3.0
+    for intento in range(1, INTENTOS + 1):
+        transcurrido = time.monotonic() - _ultima_llamada[0]
+        if transcurrido < PAUSA_ENTRE_LLAMADAS:
+            time.sleep(PAUSA_ENTRE_LLAMADAS - transcurrido)
+        _ultima_llamada[0] = time.monotonic()
+
+        r = requests.get(url, params=params, headers=headers, timeout=timeout)
+        if r.status_code not in REINTENTABLES:
+            r.raise_for_status()
+            return r
+        if intento == INTENTOS:
+            r.raise_for_status()
+
+        # Respetamos Retry-After si el servidor lo manda
+        cabecera = (r.headers.get("Retry-After") or "").strip()
+        pausa = float(cabecera) if cabecera.isdigit() else espera
+        pausa = min(pausa, 30.0) + random.uniform(0, 1.0)
+        print(f"    (respuesta {r.status_code}; reintento {intento} de "
+              f"{INTENTOS - 1} en {pausa:.0f}s)")
+        time.sleep(pausa)
+        espera *= 2
+    raise RuntimeError("inalcanzable")
 
 
 def _first(d, *keys, default=None):
@@ -90,13 +128,11 @@ def fetch_account(username, api_key=None, limit=None):
     if not api_key:
         raise RuntimeError("Falta TWITTERAPI_KEY")
 
-    r = requests.get(
+    r = _pedir(
         f"{BASE}/twitter/user/last_tweets",
         params={"userName": username},
         headers={"X-API-Key": api_key},
-        timeout=45,
     )
-    r.raise_for_status()
     payload = r.json()
 
     data = payload.get("data") or payload
