@@ -1,0 +1,42 @@
+name: 3. Probar sin publicar
+
+# Hace todo el proceso pero NO publica en Facebook.
+# Te deja la imagen ya convertida para que la veas, y te enseña el texto.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Preparar la siguiente publicación (sin enviarla)
+        run: python -m bot.post --dry-run
+
+      - name: Mostrar el resultado en pantalla
+        if: always()
+        run: |
+          if [ -f preview/resumen.md ]; then
+            cat preview/resumen.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## No había nada listo para publicar" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Puede ser que la cola esté vacía o que el contenido aún esté madurando." >> $GITHUB_STEP_SUMMARY
+            echo "Corre el botón **1. Revisar que todo esté bien** para ver el detalle." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Dejar la imagen para descargar
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: imagen-de-prueba
+          path: preview/
+          if-no-files-found: ignore
+          retention-days: 7
