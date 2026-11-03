@@ -1,0 +1,6 @@
+Pon aquí tu logo con el nombre exacto: logo.png
+
+- Formato PNG con fondo transparente
+- Ancho recomendado: entre 600 y 900 píxeles
+
+Si no pones logo, el bot publica igual, nada más que sin él.
