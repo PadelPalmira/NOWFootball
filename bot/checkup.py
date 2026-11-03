@@ -194,6 +194,83 @@ def revisar_cola():
         avisos.append("Nada listo para publicar en este momento")
 
 
+def revisar_ritmo():
+    import datetime as dt
+    from . import ritmo
+
+    seccion("5. RITMO Y FRENOS DE SEGURIDAD")
+    posted = store.load_posted()
+    ahora = dt.datetime.now(dt.timezone.utc)
+
+    if config.MODO_REVISION:
+        print(f"{OK} Modo REVISION: los posts se dejan programados "
+              f"{config.HORAS_ANTICIPACION} h antes.")
+        print("       Los revisas y cancelas en Meta Business Suite.")
+    else:
+        print(f"{AVISO} Modo DIRECTO: publica de inmediato, sin que puedas revisarlo antes.")
+        avisos.append("Modo directo, sin revision previa")
+
+    if ritmo.en_pausa():
+        print(f"\n{MAL} EL BOT ESTA EN PAUSA.")
+        print(f"        Existe el archivo '{config.ARCHIVO_PAUSA}' en el repositorio.")
+        print("        Borralo desde GitHub cuando quieras reanudar.")
+        problemas.append("El bot esta en pausa")
+    else:
+        print(f"{OK} Sin pausa activa.")
+
+    fallos = ritmo.fallos_seguidos(posted)
+    if fallos >= config.MAX_FALLOS_SEGUIDOS:
+        print(f"\n{MAL} DETENIDO: Facebook rechazo las ultimas {fallos} publicaciones.")
+        print("        El bot no va a intentar mas hasta que se resuelva.")
+        problemas.append(f"Detenido tras {fallos} fallos seguidos de Facebook")
+    elif fallos:
+        print(f"{AVISO} {fallos} fallo(s) seguido(s) de Facebook. "
+              f"A los {config.MAX_FALLOS_SEGUIDOS} se detiene solo.")
+        avisos.append(f"{fallos} fallos seguidos de Facebook")
+    else:
+        print(f"{OK} Sin fallos recientes de Facebook.")
+
+    tope, nota = ritmo.tope_de_hoy(posted, ahora)
+    hoy = ritmo.cuenta_del_dia(posted, ahora.astimezone(config.TZ).date())
+    semana = ritmo.cuenta_de_la_semana(posted, ahora)
+    print(f"\n       Cupo de hoy    : {hoy} de {tope}   ({nota})")
+    print(f"       Esta semana    : {semana} de {config.TOPE_SEMANAL}")
+    print(f"       Ventana horaria: {config.VENTANA_INICIO}:00 a "
+          f"{config.VENTANA_FIN}:00, hora de Mazatlan")
+
+    pendientes = [i for i in posted.get("items", [])
+                  if i.get("modo") == "programado" and i.get("publica_en")]
+    futuros = []
+    for i in pendientes:
+        try:
+            d = dt.datetime.fromisoformat(i["publica_en"])
+            if d > ahora:
+                futuros.append((d, i))
+        except ValueError:
+            pass
+    if futuros:
+        print(f"\n{OK} {len(futuros)} publicacion(es) programada(s) por salir:")
+        for d, i in sorted(futuros)[:5]:
+            print(f"       {d.astimezone(config.TZ).strftime('%d/%m %H:%M')}  "
+                  f"@{i.get('author')}")
+
+    bloq = _contar_bloqueados()
+    if bloq:
+        print(f"\n       Lista negra: {bloq[0]} cuenta(s), {bloq[1]} publicacion(es)")
+
+
+def _contar_bloqueados():
+    import json
+    if not os.path.exists(config.BLOQUEADOS_FILE):
+        return None
+    try:
+        with open(config.BLOQUEADOS_FILE, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return len(d.get("cuentas", [])), len(d.get("tweets", []))
+    except Exception:
+        return None
+
+
 def run():
     print("\n" + "#" * 60)
     print("#  REVISION DEL BOT DE NOW FOOTBALL")
@@ -204,6 +281,7 @@ def run():
     revisar_facebook()
     revisar_logo()
     revisar_cola()
+    revisar_ritmo()
 
     seccion("RESULTADO")
     if problemas:

@@ -1,21 +1,37 @@
-"""Publicador: saca el mejor candidato de la cola y lo postea en Now Football.
+"""Publicador: elige el mejor candidato y lo publica (o lo deja programado).
 
-Corre cada 2h. Nunca repite imagen: compara con hash perceptual contra todo
-lo ya publicado, así ni una versión recortada o recomprimida se cuela dos veces.
+Antes de publicar pasa por todos los frenos de bot/ritmo.py: pausa manual,
+cupo del día, arranque gradual, separación mínima, ventana horaria y el
+reparto aleatorio de turnos.
 """
 import datetime as dt
+import json
 import os
+import random
 import shutil
 import sys
 import tempfile
 
-from . import caption, config, facebook, imaging, phash, scoring, store
+from . import caption, config, facebook, imaging, phash, ritmo, scoring, store
 
 MAX_INTENTOS = 6     # cuántos candidatos probar antes de rendirse en esta corrida
 
 
+def _cargar_bloqueados():
+    """Cuentas o publicaciones que el bot nunca debe usar."""
+    if not os.path.exists(config.BLOQUEADOS_FILE):
+        return {"cuentas": [], "tweets": []}
+    try:
+        with open(config.BLOQUEADOS_FILE, encoding="utf-8") as fh:
+            d = json.load(fh)
+    except (json.JSONDecodeError, OSError):
+        return {"cuentas": [], "tweets": []}
+    return {"cuentas": [str(c).lstrip("@").lower() for c in d.get("cuentas", [])],
+            "tweets": [str(t) for t in d.get("tweets", [])]}
+
+
 def _es_duplicada(ph, url, posted):
-    """Dos filtros: URL exacta del medio (certeza) y similitud visual (recomprimidas)."""
+    """Dos filtros: URL exacta del medio (certeza) y similitud visual."""
     for item in posted.get("items", []):
         if url and item.get("image_url") == url:
             return True
@@ -25,16 +41,43 @@ def _es_duplicada(ph, url, posted):
     return False
 
 
-def run(dry_run=False):
+def _ultima_cuenta(posted):
+    for item in reversed(posted.get("items", [])):
+        if not item.get("skipped"):
+            return item.get("author")
+    return None
+
+
+def run(dry_run=False, ahora=None, rng=None):
     queue = store.load_queue()
     posted = store.load_posted()
     usados = store.posted_ids(posted)
+    bloqueados = _cargar_bloqueados()
+    rng = rng or random
+    ahora = ahora or dt.datetime.now(dt.timezone.utc)
 
-    ranking = scoring.rank_eligible(queue, usados)
+    # ---------- Frenos de ritmo (no aplican a la prueba sin publicar)
+    if not dry_run:
+        adelante, razon, momento = ritmo.decidir(posted, ahora, rng)
+        print(f"Ritmo: {razon}\n")
+        if not adelante:
+            return 0
+    else:
+        momento = ritmo.momento_objetivo(ahora, rng) if config.MODO_REVISION else None
+
+    # ---------- Elegir candidato
+    ranking = scoring.rank_eligible(queue, usados, ahora)
     if not ranking:
         print("No hay candidatos elegibles en esta corrida. "
               "Puede ser que todo sea muy reciente o no alcance el mínimo de reposts.")
         return 0
+
+    anterior = _ultima_cuenta(posted)
+    if config.NO_REPETIR_CUENTA_SEGUIDA and anterior and len(ranking) > 1:
+        otras = [(s, t) for s, t in ranking if t["author"] != anterior]
+        if otras:
+            ranking = otras + [(s, t) for s, t in ranking if t["author"] == anterior]
+            print(f"El post anterior fue de @{anterior}; se prefiere otra cuenta.\n")
 
     print(f"{len(ranking)} candidatos elegibles. Probando los mejores:\n")
     tmpdir = tempfile.mkdtemp(prefix="nfb_")
@@ -42,6 +85,13 @@ def run(dry_run=False):
     for score, tweet in ranking[:MAX_INTENTOS]:
         etiqueta = f"@{tweet['author']} · {tweet['retweets']} RT · score {score:.2f}"
         print(f"  → {etiqueta}")
+
+        if tweet["author"].lower() in bloqueados["cuentas"]:
+            print("    [x] Cuenta en la lista negra. Se omite.")
+            continue
+        if tweet["id"] in bloqueados["tweets"]:
+            print("    [x] Publicación en la lista negra. Se omite.")
+            continue
 
         destino = os.path.join(tmpdir, f"{tweet['id']}.jpg")
         try:
@@ -57,39 +107,48 @@ def run(dry_run=False):
                 "id": tweet["id"], "author": tweet["author"],
                 "phash": ph, "image_url": tweet.get("image_url"),
                 "skipped": "duplicada",
-                "at": dt.datetime.now(dt.timezone.utc).isoformat(),
+                "at": ahora.isoformat(),
             })
             usados.add(tweet["id"])
             continue
 
-        texto = caption.build(tweet)
+        texto = caption.build(tweet, rng)
 
         if dry_run:
             os.makedirs("preview", exist_ok=True)
             shutil.copy(destino, "preview/siguiente.jpg")
             with open("preview/caption.txt", "w", encoding="utf-8") as fh:
                 fh.write(texto)
+            cuando = (momento.astimezone(config.TZ).strftime("%d/%m a las %H:%M")
+                      if momento else "de inmediato")
             with open("preview/resumen.md", "w", encoding="utf-8") as fh:
                 fh.write(
                     "## Esto es lo que se publicaria\n\n"
                     f"- **Cuenta de origen:** @{tweet['author']}\n"
                     f"- **Reposts que tiene:** {tweet['retweets']}\n"
+                    f"- **Saldria:** {cuando} (hora de Mazatlan)\n"
                     f"- **Publicacion original:** {tweet.get('url')}\n\n"
                     "### Texto que llevaria\n\n"
                     f"```\n{texto}\n```\n\n"
                     "La imagen ya convertida a 4:5 esta como archivo descargable\n"
                     "al final de esta pagina, en la seccion **Artifacts**.\n"
                 )
-            print("\n--- PRUEBA: no se publico nada en Facebook ---")
-            print(f"Texto que llevaria:\n{texto}\n")
+            print("\n--- PRUEBA: no se publicó nada en Facebook ---")
+            print(f"Saldría: {cuando}")
+            print(f"Texto que llevaría:\n{texto}\n")
             return 0
 
         try:
-            resp = facebook.post_photo(destino, texto)
+            resp = facebook.post_photo(destino, texto, publicar_en=momento)
         except Exception as e:
+            posted["fallos_seguidos"] = ritmo.fallos_seguidos(posted) + 1
+            store.save_posted(posted)
             print(f"    [!] Falló la publicación: {e}", file=sys.stderr)
+            print(f"    Fallos seguidos: {posted['fallos_seguidos']} de "
+                  f"{config.MAX_FALLOS_SEGUIDOS}", file=sys.stderr)
             return 1
 
+        posted["fallos_seguidos"] = 0
         posted["items"].append({
             "id": tweet["id"],
             "author": tweet["author"],
@@ -98,12 +157,22 @@ def run(dry_run=False):
             "retweets": tweet["retweets"],
             "score": round(score, 3),
             "tweet_url": tweet.get("url"),
-            "fb_post_id": resp.get("post_id") or resp.get("id"),
-            "at": dt.datetime.now(dt.timezone.utc).isoformat(),
+            "fb_post_id": resp.get("post_id"),
+            "modo": resp.get("modo"),
+            "publica_en": resp.get("publica_en"),
+            "at": ahora.isoformat(),
         })
         store.save_posted(posted)
-        print(f"\n✅ Publicado en Now Football ({etiqueta})")
-        print(f"   ID de Facebook: {resp.get('post_id') or resp.get('id')}")
+
+        if resp.get("modo") == "programado":
+            local = momento.astimezone(config.TZ)
+            print(f"\n✅ PROGRAMADO para el {local.strftime('%d/%m a las %H:%M')} "
+                  f"(hora de Mazatlán) · {etiqueta}")
+            print("   Puedes revisarlo o cancelarlo en Meta Business Suite,")
+            print("   en la sección de publicaciones programadas.")
+        else:
+            print(f"\n✅ Publicado en Now Football ({etiqueta})")
+        print(f"   ID de Facebook: {resp.get('post_id')}")
         return 0
 
     store.save_posted(posted)
