@@ -1,0 +1,46 @@
+name: 4. Publicar en Now Football
+
+# Publica de verdad. Corre solo cada 2 horas de 6am a 10pm (hora de Mazatlán).
+# El botón es por si quieres publicar algo de inmediato.
+
+on:
+  schedule:
+    #   13 UTC = 6am    15 = 8am    17 = 10am   19 = 12pm   21 = 2pm
+    #   23 UTC = 4pm     1 = 6pm     3 = 8pm     5 = 10pm
+    - cron: '0 1,3,5,13,15,17,19,21,23 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: estado-del-bot
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Elegir la mejor imagen y publicarla
+        env:
+          FB_PAGE_ID:    ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+        run: python -m bot.post
+
+      - name: Guardar el registro
+        if: always()
+        run: |
+          git config user.name  "nowfootball-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add state/
+          git diff --staged --quiet && echo "Sin cambios." && exit 0
+          git commit -m "publicado $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git pull --rebase --autostash
+          git push
