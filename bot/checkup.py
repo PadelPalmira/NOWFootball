@@ -45,19 +45,30 @@ def revisar_x():
             if codigo == 401:
                 print(f"{MAL} @{cuenta}: la llave de twitterapi.io es incorrecta.")
                 problemas.append("La llave de twitterapi.io no sirve")
-            elif codigo == 402:
+                return          # la llave es la misma para todas: no tiene caso seguir
+            if codigo == 402:
                 print(f"{MAL} @{cuenta}: se acabo el saldo de twitterapi.io. Recarga en su pagina.")
                 problemas.append("Sin saldo en twitterapi.io")
+                return
+            if codigo == 404:
+                print(f"{MAL} @{cuenta}: esa cuenta no existe o cambio de nombre en X.")
+                print("        Revisa como se escribe en ACCOUNTS, dentro de bot/config.py.")
+                problemas.append(f"@{cuenta} no existe en X")
+            elif codigo == 429:
+                print(f"{MAL} @{cuenta}: twitterapi.io sigue pidiendo esperar (429),")
+                print("        incluso despues de varios reintentos. Vuelve a correr")
+                print("        este boton en unos minutos.")
+                problemas.append(f"twitterapi.io pidio esperar en @{cuenta}")
             else:
                 print(f"{MAL} @{cuenta}: error {codigo} al consultar.")
                 problemas.append(f"Error {codigo} consultando @{cuenta}")
-            return
+            continue            # seguimos con las demas cuentas
         except Exception as e:
             print(f"{MAL} @{cuenta}: {e}")
             problemas.append(f"Fallo consultando @{cuenta}")
-            return
+            continue
 
-    if total_fotos == 0:
+    if total_fotos == 0 and not problemas:
         print(f"\n{MAL} Ninguna cuenta devolvio imagenes.")
         print("        Esto casi siempre significa que twitterapi.io cambio algo")
         print("        por dentro. Mandale esta pantalla a Claude y lo ajusta.")
