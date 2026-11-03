@@ -18,6 +18,10 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Preparar la siguiente publicación (sin enviarla)
+        env:
+          TWITTERAPI_KEY: ${{ secrets.TWITTERAPI_KEY }}
+          FB_PAGE_ID:     ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_TOKEN:  ${{ secrets.FB_PAGE_TOKEN }}
         run: python -m bot.post --dry-run
 
       - name: Mostrar el resultado en pantalla
