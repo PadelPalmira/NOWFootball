@@ -34,8 +34,9 @@ jobs:
 
       - name: Elegir la mejor imagen y programarla
         env:
-          FB_PAGE_ID:    ${{ secrets.FB_PAGE_ID }}
-          FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+          TWITTERAPI_KEY: ${{ secrets.TWITTERAPI_KEY }}
+          FB_PAGE_ID:     ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_TOKEN:  ${{ secrets.FB_PAGE_TOKEN }}
         run: python -m bot.post
 
       - name: Guardar el registro
