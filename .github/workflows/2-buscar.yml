@@ -1,0 +1,42 @@
+name: 2. Buscar contenido nuevo
+
+# Lee las cuentas de X y guarda los candidatos. NO publica nada.
+# Corre solo cada 4 horas; el botón es por si quieres adelantarlo.
+
+on:
+  schedule:
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: estado-del-bot
+  cancel-in-progress: false
+
+jobs:
+  buscar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Traer publicaciones nuevas
+        env:
+          TWITTERAPI_KEY: ${{ secrets.TWITTERAPI_KEY }}
+        run: python -m bot.collect
+
+      - name: Guardar la cola
+        run: |
+          git config user.name  "nowfootball-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add state/
+          git diff --staged --quiet && echo "Sin cambios." && exit 0
+          git commit -m "cola actualizada $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git pull --rebase --autostash
+          git push
