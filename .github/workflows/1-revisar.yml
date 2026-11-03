@@ -1,0 +1,24 @@
+name: 1. Revisar que todo esté bien
+
+# Botón de diagnóstico. No publica nada ni cambia nada.
+# Te dice en español si las conexiones funcionan y qué falta.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Revisar conexiones, logo y cola
+        env:
+          TWITTERAPI_KEY: ${{ secrets.TWITTERAPI_KEY }}
+          FB_PAGE_ID:     ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_TOKEN:  ${{ secrets.FB_PAGE_TOKEN }}
+        run: python -m bot.checkup
