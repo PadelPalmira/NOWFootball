@@ -12,7 +12,7 @@ import shutil
 import sys
 import tempfile
 
-from . import caption, config, facebook, imaging, phash, ritmo, scoring, store
+from . import caption, collect, config, facebook, imaging, phash, ritmo, scoring, store
 
 MAX_INTENTOS = 6     # cuántos candidatos probar antes de rendirse en esta corrida
 
@@ -63,14 +63,36 @@ def run(dry_run=False, ahora=None, rng=None):
         if not adelante:
             return 0
     else:
-        momento = ritmo.momento_objetivo(ahora, rng) if config.MODO_REVISION else None
+        momento = ritmo.momento_objetivo(ahora, rng)
 
-    # ---------- Elegir candidato
-    ranking = scoring.rank_eligible(queue, usados, ahora)
+    # ---------- Datos frescos de X
+    # Se consulta justo ahora, no se usa lo que hubiera guardado de antes:
+    # buscamos lo mejor de las últimas 2 horas y eso cambia minuto a minuto.
+    if not dry_run or config.REFRESCAR_EN_PRUEBA:
+        print("Consultando X...")
+        queue, nuevos, _, errores = collect.refrescar(queue, ahora)
+        queue = collect.limpiar(queue, ahora)
+        store.save_queue(queue)
+        if errores:
+            fallidas = ", ".join("@" + c for c, _ in errores)
+            print(f"  [!] No respondieron: {fallidas}. Se sigue con las demás.")
+            if len(errores) == len(config.ACCOUNTS):
+                print("Ninguna cuenta respondió. No se publica nada en esta corrida.",
+                      file=sys.stderr)
+                return 1
+        print(f"  {nuevos} publicaciones nuevas · {len(queue)} en total\n")
+
+    # ---------- Elegir candidato: ventana más reciente que tenga algo
+    ranking, ventana = scoring.rank_por_ventana(queue, usados, ahora)
     if not ranking:
-        print("No hay candidatos elegibles en esta corrida. "
-              "Puede ser que todo sea muy reciente o no alcance el mínimo de reposts.")
+        print(f"Nada publicable en las últimas {config.VENTANAS_HORAS[-1]} horas.")
+        print("Puede ser que las cuentas no hayan publicado imágenes nuevas,")
+        print("o que todo lo reciente ya se haya publicado antes.")
         return 0
+    print(f"Ventana usada: últimas {ventana} h · {len(ranking)} candidatos")
+    if ventana != config.VENTANAS_HORAS[0]:
+        print(f"  (no había nada en las últimas {config.VENTANAS_HORAS[0]} h, "
+              f"se amplió la búsqueda)")
 
     anterior = _ultima_cuenta(posted)
     if config.NO_REPETIR_CUENTA_SEGUIDA and anterior and len(ranking) > 1:
@@ -79,11 +101,14 @@ def run(dry_run=False, ahora=None, rng=None):
             ranking = otras + [(s, t) for s, t in ranking if t["author"] == anterior]
             print(f"El post anterior fue de @{anterior}; se prefiere otra cuenta.\n")
 
-    print(f"{len(ranking)} candidatos elegibles. Probando los mejores:\n")
+    print("\nProbando los mejores:\n")
     tmpdir = tempfile.mkdtemp(prefix="nfb_")
 
     for score, tweet in ranking[:MAX_INTENTOS]:
-        etiqueta = f"@{tweet['author']} · {tweet['retweets']} RT · score {score:.2f}"
+        horas = scoring.age_hours(tweet, ahora)
+        etiqueta = (f"@{tweet['author']} · {tweet['retweets']} RT en "
+                    f"{horas:.1f} h ({scoring.tasa(tweet, ahora):.0f} RT/h) "
+                    f"· score {score:.2f}")
         print(f"  → {etiqueta}")
 
         if tweet["author"].lower() in bloqueados["cuentas"]:
@@ -125,7 +150,9 @@ def run(dry_run=False, ahora=None, rng=None):
                 fh.write(
                     "## Esto es lo que se publicaria\n\n"
                     f"- **Cuenta de origen:** @{tweet['author']}\n"
-                    f"- **Reposts que tiene:** {tweet['retweets']}\n"
+                    f"- **Reposts que tiene:** {tweet['retweets']} "
+                    f"en {horas:.1f} h ({scoring.tasa(tweet, ahora):.0f} por hora)\n"
+                    f"- **Ventana:** lo mejor de las ultimas {ventana} h\n"
                     f"- **Saldria:** {cuando} (hora de Mazatlan)\n"
                     f"- **Publicacion original:** {tweet.get('url')}\n\n"
                     "### Texto que llevaria\n\n"
@@ -159,6 +186,8 @@ def run(dry_run=False, ahora=None, rng=None):
             "tweet_url": tweet.get("url"),
             "fb_post_id": resp.get("post_id"),
             "modo": resp.get("modo"),
+            "ventana_h": ventana,
+            "tasa": round(scoring.tasa(tweet, ahora), 1),
             "publica_en": resp.get("publica_en"),
             "at": ahora.isoformat(),
         })

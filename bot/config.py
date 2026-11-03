@@ -16,11 +16,20 @@ FB_PAGE_TOKEN  = os.environ.get("FB_PAGE_TOKEN", "")
 FB_API_VERSION = os.environ.get("FB_API_VERSION", "v23.0")
 
 # ---------- Modo de publicación ----------
-# True  = deja los posts PROGRAMADOS en Facebook 24 h antes, para que los
-#         revises en Meta Business Suite y canceles el que no te convenza.
-# False = publica de inmediato.
-MODO_REVISION       = True
-HORAS_ANTICIPACION  = 24
+# El contenido es breaking news: publicar 24 h después no tendría sentido, así
+# que el bot publica de inmediato.
+#
+# El post se deja programado con un retraso corto y aleatorio. Esto hace dos
+# cosas a la vez: desordena la hora (si publicara al instante caería siempre
+# en la hora exacta del reloj, que es la firma de un robot) y te deja una
+# ventana para cancelarlo en Meta Business Suite si algo no te cuadra.
+# Facebook exige un mínimo de 10 minutos para programar.
+# Pon (0, 0) si prefieres que salga al instante.
+RETRASO_MINUTOS = (12, 30)
+
+# Que el botón "3. Probar sin publicar" también consulte X en vivo, para que
+# la vista previa sea de verdad lo que saldría.
+REFRESCAR_EN_PRUEBA = True
 
 # ---------- Ritmo (protección contra verse automatizado) ----------
 # Horas locales a las que el bot despierta. El código decide en cuáles
@@ -49,18 +58,19 @@ MAX_FALLOS_SEGUIDOS = 3     # tras estos fallos de Facebook, el bot se detiene
 
 # ---------- Reglas de selección ----------
 TWEETS_PER_ACCOUNT = 20     # cuántos tweets recientes se revisan por cuenta
-MATURITY_HOURS     = 8      # un tweet debe tener al menos estas horas para ser elegible
-                            # (si no, aún no acumuló reposts y lo juzgaríamos mal)
-MAX_QUEUE_AGE_DAYS = 10     # después de esto se descarta de la cola
-MIN_RETWEETS       = 15     # piso absoluto de calidad
+MAX_QUEUE_AGE_DAYS = 3      # después de esto se descarta de la cola
+MIN_RETWEETS       = 5      # piso mínimo para no publicar algo sin ninguna tracción
 QUEUE_HARD_LIMIT   = 400    # tope de la cola para que el JSON no crezca sin control
 
-# Penalización por antigüedad al elegir (prefiere lo fresco, pero deja usable el backlog)
-DECAY = [
-    (48,  1.00),   # menos de 48h -> sin penalización
-    (120, 0.85),   # menos de 5 días
-    (999, 0.70),   # más viejo
-]
+# Al momento de publicar se busca primero en las últimas 2 horas. Si en esa
+# ventana no hay nada que sirva (o todo ya se publicó), se abre a 4 horas,
+# luego a 8, y así. La primera ventana que tenga algo, gana.
+VENTANAS_HORAS = [2, 4, 8, 24]
+
+# Un tweet de 10 minutos con 200 reposts está explotando más que uno de 2 horas
+# con 300, así que se mide la TASA (reposts por hora), no el total. Este piso de
+# edad evita que un tweet de 3 minutos dé una tasa absurda.
+EDAD_MINIMA_HORAS = 0.5
 
 # ---------- Imagen 4:5 ----------
 CANVAS_W, CANVAS_H = 1080, 1350

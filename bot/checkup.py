@@ -171,27 +171,25 @@ def revisar_cola():
         avisos.append("Cola vacia")
         return
 
-    listos = scoring.rank_eligible(cola, ya_usados)
     ahora = dt.datetime.now(dt.timezone.utc)
-    inmaduros = sum(1 for t in cola.values()
-                    if scoring.age_hours(t, ahora) < config.MATURITY_HOURS
-                    and t["id"] not in ya_usados)
+    listos, ventana = scoring.rank_por_ventana(cola, ya_usados, ahora)
 
-    print(f"       Listos para publicar : {len(listos)}")
-    print(f"       Aun madurando        : {inmaduros} (esperan {config.MATURITY_HOURS}h)")
+    for horas in config.VENTANAS_HORAS:
+        cuantos, _ = scoring.rank_por_ventana(cola, ya_usados, ahora, [horas])
+        print(f"       Publicables en las ultimas {horas:>2} h : {len(cuantos)}")
 
     if listos:
-        print(f"\n{OK} Lo siguiente que publicaria:")
+        print(f"\n{OK} Se usaria la ventana de {ventana} h. Lo siguiente que saldria:")
         for sc, t in listos[:3]:
-            print(f"       @{t['author']:<18} {t['retweets']:>6} reposts")
+            print(f"       @{t['author']:<18} {t['retweets']:>5} RT en "
+                  f"{scoring.age_hours(t, ahora):.1f} h "
+                  f"({scoring.tasa(t, ahora):.0f} RT/h)")
     else:
-        print(f"\n{AVISO} Ahorita no hay nada listo para publicar.")
-        if inmaduros:
-            print(f"        Hay {inmaduros} esperando a cumplir {config.MATURITY_HOURS} horas.")
-            print("        Vuelve a revisar mas tarde: es el comportamiento correcto.")
-        else:
-            print(f"        Nada alcanza el minimo de {config.MIN_RETWEETS} reposts.")
-        avisos.append("Nada listo para publicar en este momento")
+        print(f"\n{AVISO} Ahorita no hay nada publicable.")
+        print("        Las cuentas no han publicado imagenes nuevas, o todo lo")
+        print("        reciente ya se publico antes. Al momento de publicar el bot")
+        print("        consulta X en vivo, asi que esto puede cambiar en minutos.")
+        avisos.append("Nada publicable en este momento")
 
 
 def revisar_ritmo():
@@ -202,13 +200,17 @@ def revisar_ritmo():
     posted = store.load_posted()
     ahora = dt.datetime.now(dt.timezone.utc)
 
-    if config.MODO_REVISION:
-        print(f"{OK} Modo REVISION: los posts se dejan programados "
-              f"{config.HORAS_ANTICIPACION} h antes.")
-        print("       Los revisas y cancelas en Meta Business Suite.")
+    minimo, maximo = config.RETRASO_MINUTOS
+    if maximo > 0:
+        print(f"{OK} Publica lo mas caliente del momento, programado "
+              f"{minimo}-{maximo} min despues.")
+        print("       Ese margen te deja cancelarlo en Meta Business Suite.")
     else:
-        print(f"{AVISO} Modo DIRECTO: publica de inmediato, sin que puedas revisarlo antes.")
-        avisos.append("Modo directo, sin revision previa")
+        print(f"{AVISO} Publica al instante, sin margen para cancelar")
+        print("       y siempre a la hora exacta del reloj.")
+        avisos.append("Sin margen para cancelar")
+    print(f"       Busca primero en las ultimas {config.VENTANAS_HORAS[0]} h; si no hay")
+    print(f"       nada, amplia a {config.VENTANAS_HORAS[1:]} h.")
 
     if ritmo.en_pausa():
         print(f"\n{MAL} EL BOT ESTA EN PAUSA.")

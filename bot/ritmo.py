@@ -84,28 +84,22 @@ def slots_restantes(hora_local_actual):
 # ---------------------------------------------------------------- la decisión
 
 def momento_objetivo(ahora, rng):
-    """A qué hora saldría la publicación, con el desorden aplicado."""
-    base = ahora
-    if config.MODO_REVISION:
-        base = ahora + dt.timedelta(hours=config.HORAS_ANTICIPACION)
-    desfase = rng.randint(-config.JITTER_MINUTOS, config.JITTER_MINUTOS)
-    objetivo = base + dt.timedelta(minutes=desfase)
+    """Cuándo sale la publicación. None = al instante.
 
-    # Nunca fuera de la ventana horaria local
+    El retraso es corto y aleatorio: desordena la hora (publicar al instante
+    la dejaría clavada en la hora del cron) y da margen para cancelar.
+    """
+    minimo, maximo = config.RETRASO_MINUTOS
+    if maximo <= 0:
+        return None
+
+    minutos = rng.randint(max(minimo, 11), max(maximo, 11))
+    objetivo = ahora + dt.timedelta(minutes=minutos)
+
+    # Que el retraso no empuje la publicación fuera de la ventana horaria
     local = _local(objetivo)
-    if local.hour < config.VENTANA_INICIO:
-        local = local.replace(hour=config.VENTANA_INICIO,
-                              minute=rng.randint(5, 50), second=0, microsecond=0)
-    elif local.hour >= config.VENTANA_FIN:
-        local = local.replace(hour=config.VENTANA_FIN - 1,
-                              minute=rng.randint(5, 50), second=0, microsecond=0)
-    objetivo = local.astimezone(dt.timezone.utc)
-
-    # Facebook exige al menos 10 minutos de anticipación para programar
-    if config.MODO_REVISION:
-        minimo = ahora + dt.timedelta(minutes=20)
-        if objetivo < minimo:
-            objetivo = minimo
+    if local.hour >= config.VENTANA_FIN or local.hour < config.VENTANA_INICIO:
+        return None
     return objetivo
 
 
@@ -127,7 +121,14 @@ def decidir(posted, ahora=None, rng=None):
                        f"reinicia solo."), None
 
     objetivo = momento_objetivo(ahora, rng)
-    fecha = _local(objetivo).date()
+    local_ahora = _local(ahora)
+    if not (config.VENTANA_INICIO <= local_ahora.hour < config.VENTANA_FIN):
+        return False, (f"Fuera de la ventana de publicación "
+                       f"({config.VENTANA_INICIO}:00 a {config.VENTANA_FIN}:00, "
+                       f"hora de Mazatlán)."), None
+    if config.RETRASO_MINUTOS[1] > 0 and objetivo is None:
+        return False, "El retraso dejaría la publicación fuera de la ventana horaria.", None
+    fecha = _local(objetivo or ahora).date()
 
     tope, nota = tope_de_hoy(posted, ahora)
     hoy = cuenta_del_dia(posted, fecha)
@@ -141,7 +142,7 @@ def decidir(posted, ahora=None, rng=None):
 
     momentos = momentos_programados(posted)
     if momentos:
-        hueco = abs((objetivo - momentos[-1]).total_seconds()) / 3600.0
+        hueco = abs(((objetivo or ahora) - momentos[-1]).total_seconds()) / 3600.0
         if hueco < config.MIN_HORAS_ENTRE_POSTS:
             return False, (f"Queda muy pegado al anterior "
                            f"({hueco:.1f} h; el mínimo es "
