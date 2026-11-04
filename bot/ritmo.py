@@ -15,6 +15,17 @@ import random
 from . import config
 
 
+def es_manual():
+    """True cuando le picaste al botón tú, en vez de dispararse el reloj.
+
+    El salto aleatorio de turnos existe para que el bot no parezca un reloj.
+    En una prueba manual solo estorba: contestaría "turno saltado" y parecería
+    que algo está roto. Los demás frenos (pausa, cupo, horario, separación
+    mínima) sí se respetan siempre.
+    """
+    return os.environ.get("CORRIDA_MANUAL", "").lower() in ("1", "true", "yes")
+
+
 # ---------------------------------------------------------------- utilidades
 
 def _local(momento):
@@ -153,6 +164,9 @@ def decidir(posted, ahora=None, rng=None):
     quedan = slots_restantes(_local(ahora).hour)
     cupo = tope - hoy
     probabilidad = min(1.0, cupo / quedan)
+    if es_manual():
+        return True, (f"{hoy + 1} de {tope} del día ({nota}) · corrida manual, "
+                      f"no se aplica el salto aleatorio"), objetivo
     if rng.random() > probabilidad:
         return False, (f"Turno saltado a propósito (quedan {cupo} de cupo para "
                        f"{quedan} turnos; probabilidad {probabilidad:.0%}). "
