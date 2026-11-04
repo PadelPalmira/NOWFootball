@@ -37,6 +37,10 @@ jobs:
           TWITTERAPI_KEY: ${{ secrets.TWITTERAPI_KEY }}
           FB_PAGE_ID:     ${{ secrets.FB_PAGE_ID }}
           FB_PAGE_TOKEN:  ${{ secrets.FB_PAGE_TOKEN }}
+          # Cuando le picas al botón tú, no se aplica el salto aleatorio de
+          # turnos: si no, una prueba manual podría no hacer nada y parecería
+          # que está roto. Los demás frenos sí siguen activos.
+          CORRIDA_MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
         run: python -m bot.post
 
       - name: Guardar el registro
@@ -47,5 +51,13 @@ jobs:
           git add state/
           git diff --staged --quiet && echo "Sin cambios." && exit 0
           git commit -m "publicado $(date -u '+%Y-%m-%d %H:%M UTC')"
-          git pull --rebase --autostash
-          git push
+          # Si alguien guardó algo en el repo mientras esto corría, el push
+          # choca. Se reintenta un par de veces en vez de fallar.
+          for intento in 1 2 3; do
+            git pull --rebase --autostash && git push && exit 0
+            echo "Choque al guardar (intento $intento). Reintentando..."
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          echo "No se pudo guardar el registro." >&2
+          exit 1
