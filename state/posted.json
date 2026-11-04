@@ -15,6 +15,21 @@
       "tasa": 5.1,
       "tweet_url": "https://x.com/NFL_Stats/status/2117745636418433134",
       "ventana_h": 2
+    },
+    {
+      "at": "2026-11-04T02:55:29.919528+00:00",
+      "author": "polymarketblitz",
+      "fb_post_id": "100393491469174_1512405197612705",
+      "id": "2117758290235105459",
+      "image_url": "https://pbs.twimg.com/media/HVpwc1rXsAA5LCo.jpg?format=jpg&name=large",
+      "modo": "programado",
+      "phash": "02f6960ba5ce98d9",
+      "publica_en": "2026-11-04T03:30:29.919528+00:00",
+      "retweets": 17,
+      "score": 9.392,
+      "tasa": 4.7,
+      "tweet_url": "https://x.com/PolymarketBlitz/status/2117758290235105459",
+      "ventana_h": 4
     }
   ]
 }
