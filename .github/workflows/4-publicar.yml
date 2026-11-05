@@ -9,9 +9,12 @@ name: 4. Publicar en Now Football
 
 on:
   schedule:
-    # Horas de Mazatlán (UTC−7): 8am 10am 12pm 2pm 4pm 6pm 8pm 10pm
-    #                      UTC:   15   17    19   21   23   01   03   05
-    - cron: '0 1,3,5,15,17,19,21,23 * * *'
+    # Diez turnos cada hora y media, de 8:00 a 21:30 hora de Mazatlán (UTC−7).
+    # Son diez y no ocho porque en día de partido el cupo sube a 9.
+    #   en punto : 8:00  11:00  14:00  17:00  20:00
+    #   y media  : 9:30  12:30  15:30  18:30  21:30
+    - cron: '0 0,3,15,18,21 * * *'
+    - cron: '30 1,4,16,19,22 * * *'
   workflow_dispatch:
 
 permissions:
@@ -34,9 +37,10 @@ jobs:
 
       - name: Elegir la mejor imagen y programarla
         env:
-          TWITTERAPI_KEY: ${{ secrets.TWITTERAPI_KEY }}
-          FB_PAGE_ID:     ${{ secrets.FB_PAGE_ID }}
-          FB_PAGE_TOKEN:  ${{ secrets.FB_PAGE_TOKEN }}
+          TWITTERAPI_KEY:    ${{ secrets.TWITTERAPI_KEY }}
+          FB_PAGE_ID:        ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_TOKEN:     ${{ secrets.FB_PAGE_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           # Cuando le picas al botón tú, no se aplica el salto aleatorio de
           # turnos: si no, una prueba manual podría no hacer nada y parecería
           # que está roto. Los demás frenos sí siguen activos.
