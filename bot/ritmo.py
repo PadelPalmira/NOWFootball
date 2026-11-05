@@ -63,17 +63,31 @@ def fallos_seguidos(posted):
 
 # ------------------------------------------------------------------- límites
 
-def tope_de_hoy(posted, ahora):
-    """Aplica el arranque gradual. Devuelve (tope, nota)."""
+DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+
+
+def tope_del_dia_semana(fecha_local):
+    """Cuántas publicaciones permite ese día. Domingo, lunes y jueves son
+    días de partido y llevan más."""
+    dia = fecha_local.weekday()
+    return config.TOPE_POR_DIA.get(dia, config.TOPE_DIARIO), DIAS[dia]
+
+
+def tope_de_hoy(posted, ahora, fecha_local=None):
+    """Devuelve (tope, nota). Durante las dos primeras semanas manda el
+    arranque gradual; después, el cupo del día de la semana."""
+    fecha_local = fecha_local or _local(ahora).date()
+    tope_dia, nombre = tope_del_dia_semana(fecha_local)
+
     momentos = momentos_programados(posted)
     if not momentos:
-        primer_tope = config.RAMPA[0][1] if config.RAMPA else config.TOPE_DIARIO
-        return primer_tope, "primer día"
+        primer = config.RAMPA[0][1] if config.RAMPA else tope_dia
+        return min(primer, tope_dia), "primer día"
     dias = (ahora - min(momentos)).days
     for limite_dias, tope in config.RAMPA:
         if dias < limite_dias:
-            return tope, f"arranque gradual, día {dias}"
-    return config.TOPE_DIARIO, "ritmo normal"
+            return min(tope, tope_dia), f"arranque gradual, día {dias}"
+    return tope_dia, nombre
 
 
 def cuenta_del_dia(posted, fecha_local):
@@ -87,8 +101,13 @@ def cuenta_de_la_semana(posted, ahora):
 
 
 def slots_restantes(hora_local_actual):
-    """Cuántos turnos quedan hoy, contando el actual."""
-    quedan = [h for h in config.SLOTS_LOCALES if h >= hora_local_actual]
+    """Cuántos turnos quedan hoy, contando el actual.
+
+    Los turnos van cada hora y media, así que hay medias horas. Se da un
+    margen de 10 minutos para que un arranque tardío del reloj de GitHub
+    siga contando como el turno que le toca.
+    """
+    quedan = [h for h in config.SLOTS_LOCALES if h >= hora_local_actual - 0.17]
     return max(len(quedan), 1)
 
 
@@ -141,7 +160,7 @@ def decidir(posted, ahora=None, rng=None):
         return False, "El retraso dejaría la publicación fuera de la ventana horaria.", None
     fecha = _local(objetivo or ahora).date()
 
-    tope, nota = tope_de_hoy(posted, ahora)
+    tope, nota = tope_de_hoy(posted, ahora, fecha)
     hoy = cuenta_del_dia(posted, fecha)
     if hoy >= tope:
         return False, (f"Cupo del día lleno: ya hay {hoy} de {tope} "
@@ -161,7 +180,8 @@ def decidir(posted, ahora=None, rng=None):
 
     # Repartir el cupo que queda entre los turnos que quedan del día, para que
     # no se gasten todos en la mañana y las tardes queden siempre vacías.
-    quedan = slots_restantes(_local(ahora).hour)
+    local = _local(ahora)
+    quedan = slots_restantes(local.hour + local.minute / 60.0)
     cupo = tope - hoy
     probabilidad = min(1.0, cupo / quedan)
     if es_manual():

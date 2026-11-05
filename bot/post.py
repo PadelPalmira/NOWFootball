@@ -141,7 +141,7 @@ def run(dry_run=False, ahora=None, rng=None):
             usados.add(tweet["id"])
             continue
 
-        texto = caption.build(tweet, rng)
+        texto = caption.build(tweet, rng, verboso=True)
 
         if dry_run:
             os.makedirs("preview", exist_ok=True)

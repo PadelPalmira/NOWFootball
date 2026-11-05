@@ -1,15 +1,26 @@
-"""Arma el caption: texto original limpio + crédito + hashtags.
+"""Arma el texto de la publicación.
 
-El crédito y los hashtags rotan en cada publicación. Mandar siempre el mismo
-bloque de texto al final es una de las señales más claras de automatización.
+Formato fijo de Now Football:
+
+    #NFL  |  🏈 Texto de la publicación
+
+    📊 via @NFL_Stats
+
+    #NowFootball #NFLStats
+
+El "#NFL  |  " de arriba es la marca de la página y va en todas. El resto
+de los hashtags van hasta abajo y rotan, para que el pie de los posts no
+sea siempre idéntico.
 """
 import random
 import re
 
-from . import config
+from . import config, emojis, redactor
 
 TCO = re.compile(r"https?://t\.co/\S+")
 MULTISPACE = re.compile(r"\n{3,}")
+EMOJI_INICIAL = re.compile(
+    "^[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF←-⇿⬀-⯿]+\\s*")
 
 
 def clean(text):
@@ -19,26 +30,53 @@ def clean(text):
 
 
 def hashtags(rng=None):
+    """Los de abajo. El #NFL ya va arriba, así que aquí no se repite."""
     rng = rng or random
-    etiquetas = list(config.HASHTAG_FIJOS)
+    etiquetas = [h for h in config.HASHTAG_FIJOS if h.lower() != config.HASHTAG_MARCA.lower()]
     minimo, maximo = config.HASHTAG_EXTRA
-    cuantos = rng.randint(minimo, maximo)
-    bolsa = [h for h in config.HASHTAG_BOLSA if h not in etiquetas]
-    etiquetas += rng.sample(bolsa, min(cuantos, len(bolsa)))
+    bolsa = [h for h in config.HASHTAG_BOLSA
+             if h not in etiquetas and h.lower() != config.HASHTAG_MARCA.lower()]
+    etiquetas += rng.sample(bolsa, min(rng.randint(minimo, maximo), len(bolsa)))
     return " ".join(etiquetas)
 
 
 def credito(autor, rng=None):
     rng = rng or random
-    plantilla = rng.choice(config.CREDITO_VARIANTES)
-    return plantilla.format(author=autor)
+    return rng.choice(config.CREDITO_VARIANTES).format(author=autor)
 
 
-def build(tweet, rng=None):
+def encabezado(texto, rng=None):
+    """La primera línea: la marca, el separador y el texto con su emoji.
+
+    El emoji se elige con el clasificador propio, no lo pone la IA: así la
+    garantía de que una mala noticia nunca lleve emoji alegre se mantiene
+    aunque el modelo escriba otra cosa.
+    """
+    cuerpo = clean(texto)
+    if config.USAR_EMOJIS:
+        # Si el tweet ya traía emoji al inicio, no le encimamos otro
+        if not EMOJI_INICIAL.match(cuerpo):
+            emoji = emojis.para(cuerpo)
+            if emoji:
+                cuerpo = f"{emoji} {cuerpo}"
+    return f"{config.HASHTAG_MARCA}{config.SEPARADOR_MARCA}{cuerpo}"
+
+
+def build(tweet, rng=None, verboso=False):
     rng = rng or random
-    partes = [
-        clean(tweet.get("text", "")),
-        credito(tweet.get("author", ""), rng),
-        hashtags(rng),
-    ]
+    original = clean(tweet.get("text", ""))
+
+    cuerpo, nota = redactor.escribe(original, rng)
+    if verboso:
+        print(f"    Caption: {nota}")
+
+    # El emoji se decide siempre con el texto ORIGINAL: es el que trae los
+    # términos crudos del tweet y el clasificador es más confiable con él.
+    emoji = ""
+    if config.USAR_EMOJIS and not EMOJI_INICIAL.match(cuerpo):
+        emoji = emojis.para(original)
+    cabeza = f"{config.HASHTAG_MARCA}{config.SEPARADOR_MARCA}"
+    cabeza += f"{emoji} {cuerpo}" if emoji else cuerpo
+
+    partes = [cabeza, credito(tweet.get("author", ""), rng), hashtags(rng)]
     return "\n\n".join(p for p in partes if p)

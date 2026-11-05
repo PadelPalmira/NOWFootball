@@ -232,13 +232,27 @@ def revisar_ritmo():
     else:
         print(f"{OK} Sin fallos recientes de Facebook.")
 
-    tope, nota = ritmo.tope_de_hoy(posted, ahora)
-    hoy = ritmo.cuenta_del_dia(posted, ahora.astimezone(config.TZ).date())
+    fecha = ahora.astimezone(config.TZ).date()
+    tope, nota = ritmo.tope_de_hoy(posted, ahora, fecha)
+    hoy = ritmo.cuenta_del_dia(posted, fecha)
     semana = ritmo.cuenta_de_la_semana(posted, ahora)
     print(f"\n       Cupo de hoy    : {hoy} de {tope}   ({nota})")
     print(f"       Esta semana    : {semana} de {config.TOPE_SEMANAL}")
     print(f"       Ventana horaria: {config.VENTANA_INICIO}:00 a "
           f"{config.VENTANA_FIN}:00, hora de Mazatlan")
+    print(f"       Turnos al dia  : {len(config.SLOTS_LOCALES)}")
+
+    # Redactor con IA
+    if not config.USAR_IA:
+        print(f"\n{AVISO} El redactor con IA esta apagado en config.py.")
+    elif not os.environ.get("ANTHROPIC_API_KEY"):
+        print(f"\n{AVISO} Falta el secret ANTHROPIC_API_KEY.")
+        print("        Los captions van a salir con el texto tal cual del tweet,")
+        print("        sin gancho ni pregunta. El bot publica igual.")
+        avisos.append("Sin llave de IA: captions sin redactar")
+    else:
+        print(f"\n{OK} Redactor con IA activo ({config.IA_MODELO}).")
+        print(f"       Pide pregunta final en ~{config.IA_PROB_PREGUNTA:.0%} de los posts.")
 
     pendientes = [i for i in posted.get("items", [])
                   if i.get("modo") == "programado" and i.get("publica_en")]
