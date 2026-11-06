@@ -1,11 +1,16 @@
 name: 2. Buscar contenido nuevo
 
 # Lee las cuentas de X y guarda los candidatos. NO publica nada.
-# Corre solo cada 4 horas; el botón es por si quieres adelantarlo.
+# Corre solo cada 6 horas; el botón es por si quieres adelantarlo.
+# El minuto 19 no es casualidad: la hora en punto es justo cuando el
+# reloj de GitHub va más cargado y se come turnos.
+#
+# Esto es solo un respaldo para que la cola no se enfríe: el botón 4
+# consulta X por su cuenta cada vez que de verdad va a publicar.
 
 on:
   schedule:
-    - cron: '0 */4 * * *'
+    - cron: '19 */6 * * *'
   workflow_dispatch:
 
 permissions:
@@ -18,6 +23,8 @@ concurrency:
 jobs:
   buscar:
     runs-on: ubuntu-latest
+    # Una corrida se colgó 25 minutos esperando a X. Con esto, no vuelve.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
