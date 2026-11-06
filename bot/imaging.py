@@ -10,7 +10,7 @@ import os
 import requests
 from PIL import Image, ImageEnhance, ImageFilter
 
-from . import config
+from . import config, estructura, redactor, tarjeta
 
 
 def download(url, timeout=45):
@@ -90,9 +90,49 @@ def to_4x5(img, logo_path=None, bg=None):
     return canvas
 
 
-def build(url, out_path, logo_path=None):
-    """Descarga, convierte y guarda. Devuelve (ruta, imagen_original_sin_tocar)."""
+def build(url, out_path, logo_path=None, texto=None, autor=None, verboso=False):
+    """Descarga la imagen y arma la publicación.
+
+    Si la imagen es una FOTO, se arma la tarjeta de pantalla partida con el
+    texto a la izquierda. Si ya es una GRÁFICA de estadísticas, partirla la
+    volvería ilegible, así que se usa el lienzo 4:5 con fondo desenfocado.
+
+    Devuelve (ruta, imagen_original_sin_tocar). La original se devuelve sin
+    tocar porque es la que se usa para detectar repetidas: así la huella no
+    cambia aunque cambie el diseño.
+    """
     original = download(url)
-    framed = to_4x5(original, logo_path=logo_path)
-    framed.save(out_path, "JPEG", quality=90, optimize=True)
+    logo = logo_path if logo_path is not None else config.LOGO_PATH
+
+    aprobada = (autor or "").lstrip("@").lower() in {
+        c.lstrip("@").lower() for c in config.CUENTAS_TARJETA}
+
+    usar_tarjeta = False
+    motivo = ""
+    if not config.USAR_TARJETA:
+        motivo = "la tarjeta está apagada en config"
+    elif not aprobada:
+        motivo = f"@{autor} no está en CUENTAS_TARJETA"
+    elif not texto:
+        motivo = "el tweet no trae texto"
+    else:
+        titulo, lista, _ = estructura.analiza(texto)
+        if not titulo:
+            motivo = "no se pudo sacar un titular"
+        elif not config.TARJETA_SIEMPRE and tarjeta.es_grafica(original):
+            motivo = "la imagen ya es una gráfica, se deja completa"
+        else:
+            usar_tarjeta = True
+
+    if usar_tarjeta:
+        resaltar, nota = redactor.resaltado(titulo)
+        if verboso:
+            print(f"    Imagen: tarjeta de pantalla partida · {nota}")
+        armada = tarjeta.componer(original, titulo, resaltar, lista, logo)
+    else:
+        if verboso:
+            print(f"    Imagen: lienzo 4:5 con fondo desenfocado · {motivo}")
+        armada = to_4x5(original, logo_path=logo)
+
+    armada.save(out_path, "JPEG", quality=90, optimize=True)
     return out_path, original

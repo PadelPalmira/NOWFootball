@@ -51,10 +51,16 @@ def refrescar(queue, ahora=None, cuentas=None, silencioso=False):
 
 
 def limpiar(queue, ahora):
-    """Saca de la cola lo que ya es demasiado viejo para publicarse."""
+    """Saca de la cola lo viejo y lo de cuentas que ya no se siguen.
+
+    Lo segundo importa: quitar una cuenta de ACCOUNTS evita traer más suyos,
+    pero lo que ya estaba guardado seguiría siendo publicable durante días
+    si no se purga.
+    """
     corte = ahora - dt.timedelta(days=config.MAX_QUEUE_AGE_DAYS)
     queue = {k: v for k, v in queue.items()
-             if dt.datetime.fromisoformat(v["created_at"]) > corte}
+             if dt.datetime.fromisoformat(v["created_at"]) > corte
+             and v.get("author") in config.ACCOUNTS}
     if len(queue) > config.QUEUE_HARD_LIMIT:
         ordenados = sorted(queue.items(), key=lambda kv: kv[1]["created_at"], reverse=True)
         queue = dict(ordenados[: config.QUEUE_HARD_LIMIT])

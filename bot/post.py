@@ -124,7 +124,9 @@ def run(dry_run=False, ahora=None, rng=None):
 
         destino = os.path.join(tmpdir, f"{tweet['id']}.jpg")
         try:
-            _, original = imaging.build(tweet["image_url"], destino)
+            _, original = imaging.build(tweet["image_url"], destino,
+                                        texto=tweet.get("text"),
+                                        autor=tweet.get("author"), verboso=True)
         except Exception as e:
             print(f"    [!] No se pudo procesar la imagen: {e}")
             continue

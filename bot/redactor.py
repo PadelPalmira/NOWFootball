@@ -61,8 +61,16 @@ def valida(salida, fuente):
         return False, "quedó vacío o demasiado corto"
     if len(salida) > config.IA_MAX_CARACTERES:
         return False, f"se pasó de largo ({len(salida)} caracteres)"
-    if "#" in salida or "@" in salida or "http" in salida.lower():
-        return False, "metió hashtags, menciones o enlaces"
+    if "http" in salida.lower():
+        return False, "metió un enlace"
+    # Se rechazan los hashtags y menciones que la IA AGREGÓ, no los que ya
+    # venían en el tweet original: varias cuentas escriben "#NFL history"
+    # dentro de su propio texto, y rechazarlos a todos dejaba esos captions
+    # sin redactar nunca.
+    fuente_tokens = {t.lower() for t in re.findall(r"[#@]\w+", fuente or "")}
+    nuevos_tokens = {t.lower() for t in re.findall(r"[#@]\w+", salida)}
+    if nuevos_tokens - fuente_tokens:
+        return False, f"agregó hashtags o menciones que no estaban: {sorted(nuevos_tokens - fuente_tokens)}"
 
     # Lo más importante: ningún número nuevo
     nuevos = _numeros(salida) - _numeros(fuente)
@@ -125,3 +133,42 @@ def escribe(texto_fuente, rng=None):
     elif con_pregunta:
         nota += ", con pregunta"
     return salida, nota
+
+
+RESALTE = """From this sports headline, pick the single most striking phrase to highlight.
+
+HEADLINE: {titulo}
+
+RULES:
+- Reply with the phrase EXACTLY as it appears in the headline, same words, same order.
+- Between 1 and 4 words. Never the whole headline.
+- Pick the phrase that carries the news: the achievement, the number, the record.
+- Skip filler words like "the", "has", "this season".
+- Reply with the phrase only. Nothing else."""
+
+
+def resaltado(titulo, rng=None):
+    """Qué frase del titular se resalta en la tarjeta.
+
+    Si la IA no está o contesta algo que no está literal en el titular, se
+    usa la regla. Nunca inventa texto: lo que no case, se descarta.
+    """
+    from . import estructura
+    respaldo = estructura.resalte_por_reglas(titulo)
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not config.USAR_IA or not api_key or not titulo.strip():
+        return respaldo, "resalte por reglas"
+
+    try:
+        salida = _pedir(RESALTE.format(titulo=titulo), api_key)
+    except Exception:
+        return respaldo, "resalte por reglas (la IA no respondió)"
+
+    frase = salida.strip().strip('"“”.').strip()
+    # Tiene que estar literal en el titular, y no serlo entero
+    if (frase and frase.lower() in titulo.lower()
+            and 0 < len(frase.split()) <= 4
+            and len(frase) < len(titulo)):
+        return [frase], "resalte elegido por IA"
+    return respaldo, "resalte por reglas (la IA propuso algo que no cuadra)"

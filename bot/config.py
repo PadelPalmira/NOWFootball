@@ -5,7 +5,6 @@ from zoneinfo import ZoneInfo
 # ---------- Cuentas de X a monitorear ----------
 ACCOUNTS = [
     "NFL_Stats",
-    "polymarketblitz",
     "SleeperNFL",
 ]
 
@@ -70,7 +69,13 @@ MAX_FALLOS_SEGUIDOS = 3     # tras estos fallos de Facebook, el bot se detiene
 # ---------- Reglas de selección ----------
 TWEETS_PER_ACCOUNT = 20     # cuántos tweets recientes se revisan por cuenta
 MAX_QUEUE_AGE_DAYS = 3      # después de esto se descarta de la cola
-MIN_RETWEETS       = 5      # piso mínimo para no publicar algo sin ninguna tracción
+# Medir solo reposts no servía con estas cuentas: la mediana es de 7 reposts
+# y la mitad de los candidatos empatan en 2 o 3, así que el desempate salía
+# casi al azar. Los likes dan 11 veces más señal, así que se mide el
+# engagement combinado, con el repost pesando más porque cuesta más darlo.
+PESO_REPOST        = 3      # cuánto vale un repost frente a un like
+MIN_ENGAGEMENT     = 25     # piso de tracción (reposts*PESO + likes)
+MIN_RETWEETS       = 0      # ya no se usa como filtro; queda por compatibilidad
 QUEUE_HARD_LIMIT   = 400    # tope de la cola para que el JSON no crezca sin control
 
 # Al momento de publicar se busca primero en las últimas 2 horas. Si en esa
@@ -86,6 +91,53 @@ MIN_MUESTRA_BASE = 3
 # con 300, así que se mide la TASA (reposts por hora), no el total. Este piso de
 # edad evita que un tweet de 3 minutos dé una tasa absurda.
 EDAD_MINIMA_HORAS = 0.5
+
+# ---------- Tarjeta (pantalla partida) ----------
+# Diseño: foto a la derecha con halo de neón, titular y lista a la izquierda.
+USAR_TARJETA = True
+
+# El formato de tarjeta es el estándar para TODO lo que publican las cuentas
+# aprobadas, sin importar el tema. Si alguna vez sale una imagen que ya es
+# una gráfica de estadísticas y se ve partida a la mitad, poner esto en False
+# reactiva el detector que la deja completa.
+TARJETA_SIEMPRE = True
+
+# Solo estas cuentas reciben el diseño de pantalla partida. Si más adelante
+# agregas una cuenta a ACCOUNTS, NO entra aquí sola: hay que revisarla
+# primero. Algunas cuentas (BetMGM, por ejemplo) marcan sus fotos con el
+# logo del patrocinador, y eso necesita un paso extra antes de usarlas.
+CUENTAS_TARJETA = ["NFL_Stats", "SleeperNFL"]
+
+TARJETA_PROPORCION_TEXTO = 0.52   # cuánto del ancho ocupa el panel de texto
+TARJETA_MARGEN       = 54
+TARJETA_TITULAR_MAX  = 86         # el titular se achica solo hasta que quepa
+TARJETA_TITULAR_MAX_SOLO = 112    # cuando el tweet no trae lista, cabe más grande
+TARJETA_TITULAR_MIN  = 40
+TARJETA_LISTA_MIN    = 32
+TARJETA_LISTA_RATIO  = 0.50       # tamaño de la lista respecto al titular
+TARJETA_LOGO_ALTO    = 54
+TARJETA_AURA         = True
+TARJETA_AURA_RADIO   = 14
+TARJETA_AURA_FUERZA  = 0.55
+TARJETA_GLOW_RADIO   = 13
+TARJETA_GLOW_FUERZA  = 1.25        # qué tan encendido queda el neón
+TARJETA_INTERLINEA   = 0.98       # Anton se ve mejor con los renglones pegados
+TARJETA_HUECO_LISTA  = 46         # aire entre el titular y la lista
+TARJETA_SESGO_VERTICAL = 0.42     # 0 = pegado arriba, 1 = pegado abajo
+
+COLOR_FONDO_1 = "#0A1020"         # arriba del degradado
+COLOR_FONDO_2 = "#141C33"         # abajo
+COLOR_TEXTO   = "#FFFFFF"
+COLOR_RESALTE        = "#FF1F6E"  # el halo del neón
+COLOR_RESALTE_NUCLEO = "#FF8FBE"  # el núcleo, más claro, para que se lea
+COLOR_LISTA   = "#D8DEEC"
+COLOR_AURA    = "#FF2D78"
+
+# Detector de foto vs tarjeta de estadísticas. Se marca como gráfica cuando
+# se cumplen al menos dos de los tres criterios.
+GRAFICA_DOMINIO  = 0.62    # fracción de la imagen que ocupan 6 colores
+GRAFICA_VARIEDAD = 0.22    # colores distintos entre píxeles
+GRAFICA_PLANICIE = 0.55    # fracción de píxeles idénticos a su vecino
 
 # ---------- Imagen 4:5 ----------
 CANVAS_W, CANVAS_H = 1080, 1350

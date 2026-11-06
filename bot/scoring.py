@@ -26,11 +26,21 @@ def age_hours(tweet, now=None):
     return (now - created).total_seconds() / 3600.0
 
 
+def engagement(tweet):
+    """Tracción total: reposts y likes juntos, con el repost pesando más.
+
+    Medir solo reposts no funcionaba con estas cuentas: la mitad de los
+    candidatos empataba en 2 o 3 y el desempate salía casi al azar.
+    """
+    return (tweet.get("retweets", 0) * config.PESO_REPOST
+            + tweet.get("likes", 0))
+
+
 def tasa(tweet, now=None):
-    """Reposts por hora, con un piso de edad para que lo recién salido no
+    """Engagement por hora, con un piso de edad para que lo recién salido no
     produzca números absurdos."""
     horas = max(age_hours(tweet, now), config.EDAD_MINIMA_HORAS)
-    return tweet.get("retweets", 0) / horas
+    return engagement(tweet) / horas
 
 
 def baselines(queue, now=None, horas_max=None):
@@ -73,11 +83,13 @@ def _elegibles(queue, skip_ids, ahora, limite_horas, bases):
         horas = age_hours(t, ahora)
         if horas > limite_horas or horas < 0:
             continue
-        if t.get("retweets", 0) < config.MIN_RETWEETS:
+        if engagement(t) < config.MIN_ENGAGEMENT:
             continue
+        if t["author"] not in config.ACCOUNTS:
+            continue        # cuenta retirada: lo que quedó en la cola no se usa
         base = bases.get(t["author"], 1.0)
         fuera.append((score(t, base, ahora), t))
-    fuera.sort(key=lambda p: (p[0], p[1].get("retweets", 0)), reverse=True)
+    fuera.sort(key=lambda p: (p[0], engagement(p[1])), reverse=True)
     return fuera
 
 
