@@ -100,15 +100,20 @@ def cuenta_de_la_semana(posted, ahora):
     return sum(1 for m in momentos_programados(posted) if m > corte)
 
 
-def slots_restantes(hora_local_actual):
-    """Cuántos turnos quedan hoy, contando el actual.
+def _hora_decimal(local):
+    return local.hour + local.minute / 60.0
 
-    Los turnos van cada hora y media, así que hay medias horas. Se da un
-    margen de 10 minutos para que un arranque tardío del reloj de GitHub
-    siga contando como el turno que le toca.
+
+def esperado_a_estas_horas(local, tope):
+    """Cuántas publicaciones DEBERÍA llevar el día a esta hora.
+
+    Reparte el cupo del día parejo a lo largo de la ventana. Sirve para saber
+    si vamos al corriente o atrasados.
     """
-    quedan = [h for h in config.SLOTS_LOCALES if h >= hora_local_actual - 0.17]
-    return max(len(quedan), 1)
+    inicio, fin = config.VENTANA_INICIO, config.VENTANA_FIN
+    largo = max(fin - inicio, 1e-9)
+    avance = (_hora_decimal(local) - inicio) / largo
+    return tope * min(max(avance, 0.0), 1.0)
 
 
 # ---------------------------------------------------------------- la decisión
@@ -178,18 +183,38 @@ def decidir(posted, ahora=None, rng=None):
                            f"({hueco:.1f} h; el mínimo es "
                            f"{config.MIN_HORAS_ENTRE_POSTS} h)."), None
 
-    # Repartir el cupo que queda entre los turnos que quedan del día, para que
-    # no se gasten todos en la mañana y las tardes queden siempre vacías.
+    # Reparto del cupo a lo largo del día.
+    #
+    # El reloj de GitHub no es de fiar: avisa tarde y se come turnos cuando
+    # está cargado. Antes el cupo se repartía "entre los turnos que faltan",
+    # contando turnos que muchas veces no llegaban, y el día cerraba muy por
+    # debajo del cupo. Ahora la regla es simple:
+    #
+    #   - Si vamos al corriente o ATRASADOS respecto a lo que tocaría a esta
+    #     hora, se publica. Si un turno no llegó, el siguiente que sí llegue
+    #     recupera el atraso solo.
+    #   - Si vamos ADELANTADOS, se sortea, para no gastar el cupo en la mañana
+    #     y no caer en patrón de reloj.
+    #
+    # Esto nunca puede provocar una ráfaga: la separación mínima, el cupo del
+    # día, el tope semanal y la ventana horaria se revisaron todos arriba.
     local = _local(ahora)
-    quedan = slots_restantes(local.hour + local.minute / 60.0)
     cupo = tope - hoy
-    probabilidad = min(1.0, cupo / quedan)
+    esperado = esperado_a_estas_horas(local, tope)
+
     if es_manual():
         return True, (f"{hoy + 1} de {tope} del día ({nota}) · corrida manual, "
                       f"no se aplica el salto aleatorio"), objetivo
-    if rng.random() > probabilidad:
-        return False, (f"Turno saltado a propósito (quedan {cupo} de cupo para "
-                       f"{quedan} turnos; probabilidad {probabilidad:.0%}). "
+
+    if hoy <= esperado + 1e-9:
+        return True, (f"{hoy + 1} de {tope} del día ({nota}) · al ritmo que toca "
+                      f"a esta hora (tocaban {esperado:.1f})"), objetivo
+
+    if rng.random() > config.PROBABILIDAD_ADELANTO:
+        return False, (f"Turno saltado a propósito: vamos adelantados "
+                       f"({hoy} hechos, tocaban {esperado:.1f} a esta hora; "
+                       f"quedan {cupo} de cupo). "
                        f"Esto es lo que evita el patrón de reloj."), None
 
-    return True, f"{hoy + 1} de {tope} del día ({nota})", objetivo
+    return True, (f"{hoy + 1} de {tope} del día ({nota}) · adelantado "
+                  f"(tocaban {esperado:.1f})"), objetivo

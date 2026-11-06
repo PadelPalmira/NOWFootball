@@ -25,7 +25,7 @@ FB_API_VERSION = os.environ.get("FB_API_VERSION", "v23.0")
 # ventana para cancelarlo en Meta Business Suite si algo no te cuadra.
 # Facebook exige un mínimo de 10 minutos para programar.
 # Pon (0, 0) si prefieres que salga al instante.
-RETRASO_MINUTOS = (15, 35)
+RETRASO_MINUTOS = (20, 40)
 
 # Que el botón "3. Probar sin publicar" también consulte X en vivo, para que
 # la vista previa sea de verdad lo que saldría.
@@ -52,6 +52,24 @@ TOPE_SEMANAL = 55
 # Con 9 publicaciones en una ventana de 15 horas, el hueco promedio es de
 # 100 minutos. El mínimo baja a 1 hora para que ese cupo sea alcanzable.
 MIN_HORAS_ENTRE_POSTS = 1.0
+
+# --- Reparto del cupo a lo largo del día (v1.15) -------------------------
+# El reloj de GitHub se come turnos cuando está cargado. Antes el cupo se
+# repartía entre los turnos que faltaban y, al no llegar, el día cerraba
+# muy por debajo del cupo. Ahora, si vamos atrasados respecto a lo que
+# tocaría a esta hora, se publica sin sortear.
+# Si vamos al corriente o atrasados se publica. Si vamos adelantados, esta
+# es la probabilidad de publicar igual (baja: para eso es el freno).
+PROBABILIDAD_ADELANTO = 0.35
+
+# --- Historial acotado (v1.15) ------------------------------------------
+# El registro de publicados se guarda en el repositorio en cada corrida, así
+# que no puede crecer para siempre. Lo único que NUNCA se tira es el id y la
+# huella (phash): son los que impiden republicar una imagen.
+DIAS_MARCAS     = 7     # marcas de "repetida": se borran pasados estos días
+DIAS_DETALLE    = 120   # publicados: pasados estos días se dejan solo lo esencial
+TOPE_HISTORIAL  = 4000  # tope duro de entradas en el historial
+
 
 # Arranque gradual: (días desde la primera publicación, tope de ese periodo).
 # Pasados los 14 días se usa TOPE_DIARIO. Un salto repentino de ritmo llama
@@ -80,7 +98,7 @@ BLOQUEADOS_FILE     = "state/bloqueados.json"
 MAX_FALLOS_SEGUIDOS = 3     # tras estos fallos de Facebook, el bot se detiene
 
 # ---------- Reglas de selección ----------
-TWEETS_PER_ACCOUNT = 20     # cuántos tweets recientes se revisan por cuenta
+TWEETS_PER_ACCOUNT = 14     # cuántos tweets recientes se revisan por cuenta
 MAX_QUEUE_AGE_DAYS = 3      # después de esto se descarta de la cola
 # Medir solo reposts no servía con estas cuentas: la mediana es de 7 reposts
 # y la mitad de los candidatos empatan en 2 o 3, así que el desempate salía

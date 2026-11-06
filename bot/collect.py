@@ -50,21 +50,60 @@ def refrescar(queue, ahora=None, cuentas=None, silencioso=False):
     return queue, nuevos, actualizados, errores
 
 
-def limpiar(queue, ahora):
-    """Saca de la cola lo viejo y lo de cuentas que ya no se siguen.
+def _cuentas_seguidas():
+    return {c.lstrip("@").lower() for c in config.ACCOUNTS}
 
-    Lo segundo importa: quitar una cuenta de ACCOUNTS evita traer más suyos,
-    pero lo que ya estaba guardado seguiría siendo publicable durante días
-    si no se purga.
+
+def _nacimiento(entrada):
+    """Fecha de la publicación, o None si la entrada viene mal.
+
+    Antes esto se leía directo con fromisoformat(v["created_at"]). Una sola
+    entrada sin fecha, con fecha ilegible o sin zona horaria tiraba la corrida
+    completa con un error de Python, y eso dejaba muertos los botones 2 y 4
+    hasta que alguien corrigiera el archivo a mano. Ahora una entrada mala
+    simplemente se descarta.
+    """
+    crudo = entrada.get("created_at")
+    if not isinstance(crudo, str) or not crudo:
+        return None
+    try:
+        d = dt.datetime.fromisoformat(crudo)
+    except ValueError:
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=dt.timezone.utc)
+
+
+def limpiar(queue, ahora):
+    """Saca de la cola lo viejo, lo malformado y lo de cuentas que ya no se siguen.
+
+    Lo de las cuentas importa: quitar una cuenta de ACCOUNTS evita traer más
+    suyos, pero lo que ya estaba guardado seguiría siendo publicable durante
+    días si no se purga.
     """
     corte = ahora - dt.timedelta(days=config.MAX_QUEUE_AGE_DAYS)
-    queue = {k: v for k, v in queue.items()
-             if dt.datetime.fromisoformat(v["created_at"]) > corte
-             and v.get("author") in config.ACCOUNTS}
-    if len(queue) > config.QUEUE_HARD_LIMIT:
-        ordenados = sorted(queue.items(), key=lambda kv: kv[1]["created_at"], reverse=True)
-        queue = dict(ordenados[: config.QUEUE_HARD_LIMIT])
-    return queue
+    seguidas = _cuentas_seguidas()
+
+    limpia = {}
+    for k, v in queue.items():
+        if not isinstance(v, dict):
+            continue
+        nacio = _nacimiento(v)
+        if nacio is None or nacio <= corte:
+            continue
+        autor = v.get("author")
+        if not isinstance(autor, str) or autor.lstrip("@").lower() not in seguidas:
+            continue
+        if not v.get("image_url"):
+            continue
+        limpia[k] = v
+
+    if len(limpia) > config.QUEUE_HARD_LIMIT:
+        ordenados = sorted(limpia.items(),
+                           key=lambda kv: _nacimiento(kv[1]) or dt.datetime.min.replace(
+                               tzinfo=dt.timezone.utc),
+                           reverse=True)
+        limpia = dict(ordenados[: config.QUEUE_HARD_LIMIT])
+    return limpia
 
 
 def run():
