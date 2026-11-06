@@ -352,3 +352,102 @@ def es_grafica(img):
     if variedad < config.GRAFICA_VARIEDAD: puntos += 1
     if plano > config.GRAFICA_PLANICIE:    puntos += 1
     return puntos >= 2
+
+
+# ------------------------------------------- diseño vertical (imagen entera)
+
+def _contener(img, w, h):
+    """Escala para que la imagen quepa COMPLETA en w x h, sin recortar nada."""
+    sw, sh = img.size
+    escala = min(w / sw, h / sh)
+    return img.resize((max(1, int(sw * escala)), max(1, int(sh * escala))),
+                      Image.LANCZOS)
+
+
+def componer_vertical(foto, titulo, resaltar=None, logo_path=None):
+    """Tarjeta 4:5 con la imagen COMPLETA al centro, el titular arriba y el
+    logo abajo.
+
+    Es el diseño para cuando partir la imagen la arruinaría: gráficas de
+    estadísticas que ya traen sus datos, y capturas de pantalla de otros
+    tweets. La imagen nunca se recorta ni se parte, y el titular le pone
+    arriba el contexto con la misma tipografía y el mismo neón que la
+    tarjeta de pantalla partida, para que la página se vea pareja.
+    """
+    W, H = config.CANVAS_W, config.CANVAS_H
+    margen = config.TARJETA_MARGEN
+    util = W - margen * 2
+
+    lienzo = _fondo(W, H)
+    d = ImageDraw.Draw(lienzo)
+
+    logo = None
+    if logo_path and os.path.exists(logo_path):
+        try:
+            logo = Image.open(logo_path).convert("RGBA")
+        except Exception:
+            logo = None
+    alto_logo = config.TARJETA_LOGO_ALTO if logo else 0
+
+    # El titular se achica hasta ocupar como mucho unos renglones
+    marcadas = _marca_resaltadas(titulo, resaltar)
+    for tam in range(config.VERTICAL_TITULAR_MAX, config.TARJETA_TITULAR_MIN - 1, -2):
+        f = titular(tam)
+        renglones = _acomoda(d, marcadas, f, util)
+        alto_renglon = int(tam * config.TARJETA_INTERLINEA)
+        alto_t = len(renglones) * alto_renglon
+        if (len(renglones) <= config.VERTICAL_MAX_RENGLONES
+                and not _desborda(d, renglones, f, util)):
+            break
+
+    # El titular se ancla arriba y el logo abajo; la imagen se queda con
+    # todo el espacio de en medio. Centrar el bloque completo dejaba al logo
+    # flotando a media altura y se veía desbalanceado.
+    hueco = config.VERTICAL_HUECO
+    y_texto = margen
+    y_logo = H - margen - alto_logo
+    caja_alto = y_logo - (y_texto + alto_t) - hueco * 2
+
+    # La imagen NO lleva el aura de neón aquí: este diseño se usa sobre todo
+    # para gráficas y capturas, y teñirles los bordes de rosa las ensucia.
+    #
+    # Va a TODO el ancho del lienzo, sin margen lateral. Una imagen
+    # apaisada metida en un marco 4:5 nunca va a llenar el alto, pero
+    # dejarle además margen a los lados la encoge todavía más y la deja
+    # viéndose como una estampilla en medio del hueco.
+    img = _contener(foto.convert("RGB"), W, max(caja_alto, 80))
+
+    espacio = _ancho(d, " ", f)
+    glow = _capa_glow(lienzo.size, renglones, f, margen, y_texto, alto_renglon, espacio)
+    if glow is not None:
+        lienzo = ImageChops.screen(lienzo, glow)
+    d = ImageDraw.Draw(lienzo)
+    _dibuja_texto(d, renglones, f, margen, y_texto, alto_renglon, espacio)
+
+    # La imagen se recarga hacia abajo dentro de su hueco. El aire queda
+    # debajo del titular, donde el fondo con luces se ve a propósito, en vez
+    # de quedar entre la imagen y el logo, donde se ve como un olvido.
+    x = (W - img.size[0]) // 2
+    sobra = max(0, caja_alto - img.size[1])
+    y = y_texto + alto_t + hueco + int(sobra * config.VERTICAL_SESGO_IMAGEN)
+
+    if img.size[0] >= W:
+        # Sangra de lado a lado: solo líneas arriba y abajo, porque un marco
+        # completo dejaría dos rayas sueltas en los bordes del lienzo.
+        d.rectangle([0, y - 3, W, y - 1], fill=config.COLOR_RESALTE)
+        d.rectangle([0, y + img.size[1] + 1, W, y + img.size[1] + 3],
+                    fill=config.COLOR_RESALTE)
+    else:
+        d.rectangle([x - 2, y - 2, x + img.size[0] + 1, y + img.size[1] + 1],
+                    outline=config.COLOR_RESALTE, width=2)
+    lienzo.paste(img, (x, y))
+
+    if logo:
+        lw, lh = logo.size
+        esc = min(alto_logo / lh, (W * 0.42) / lw)
+        logo = logo.resize((max(1, int(lw * esc)), max(1, int(lh * esc))),
+                           Image.LANCZOS)
+        lienzo.paste(logo, ((W - logo.size[0]) // 2,
+                            y_logo + (alto_logo - logo.size[1]) // 2), logo)
+
+    return lienzo

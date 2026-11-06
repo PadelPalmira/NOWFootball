@@ -26,6 +26,12 @@ def age_hours(tweet, now=None):
     return (now - created).total_seconds() / 3600.0
 
 
+def vetado(tweet):
+    """True si el texto trae algo de la lista de palabras vetadas."""
+    t = (tweet.get("text") or "").lower()
+    return any(p.lower() in t for p in config.PALABRAS_VETADAS)
+
+
 def engagement(tweet):
     """Tracción total: reposts y likes juntos, con el repost pesando más.
 
@@ -87,6 +93,8 @@ def _elegibles(queue, skip_ids, ahora, limite_horas, bases):
             continue
         if t["author"] not in config.ACCOUNTS:
             continue        # cuenta retirada: lo que quedó en la cola no se usa
+        if vetado(t):
+            continue        # anuncio pagado o promoción
         base = bases.get(t["author"], 1.0)
         fuera.append((score(t, base, ahora), t))
     fuera.sort(key=lambda p: (p[0], engagement(p[1])), reverse=True)

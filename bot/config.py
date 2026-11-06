@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 ACCOUNTS = [
     "NFL_Stats",
     "SleeperNFL",
+    "NFL_DovKleiman",
 ]
 
 # ---------- Credenciales (vienen de GitHub Secrets) ----------
@@ -59,6 +60,18 @@ RAMPA = [(7, 3), (14, 4)]
 
 NO_REPETIR_CUENTA_SEGUIDA = True
 
+# ---------- Filtro de contenido ----------
+# Si alguna de estas aparece en el texto del tweet, no se publica. Sirve
+# sobre todo para los anuncios pagados: las cuentas agregadoras meten
+# promociones de casas de apuestas entre sus notas, y publicar el anuncio de
+# otro en tu página no tiene sentido.
+PALABRAS_VETADAS = [
+    "sponsored", "#ad", "ad:", "promo code", "sign up", "use code",
+    "odds boost", "bet now", "risk-free", "deposit bonus", "giveaway",
+    "888sport", "bet365", "draftkings", "fanduel", "betmgm", "caesars",
+    "gambling problem", "21+", "terms apply",
+]
+
 # ---------- Frenos de emergencia ----------
 # Si existe un archivo con este nombre en el repositorio, el bot no publica
 # nada. Crearlo o borrarlo desde GitHub es un clic.
@@ -92,6 +105,11 @@ MIN_MUESTRA_BASE = 3
 # edad evita que un tweet de 3 minutos dé una tasa absurda.
 EDAD_MINIMA_HORAS = 0.5
 
+# ---------- Lienzo ----------
+CANVAS_W, CANVAS_H = 1080, 1350
+LOGO_PATH    = "assets/logo.png"
+PHASH_DISTANCE = 6
+
 # ---------- Tarjeta (pantalla partida) ----------
 # Diseño: foto a la derecha con halo de neón, titular y lista a la izquierda.
 USAR_TARJETA = True
@@ -102,16 +120,31 @@ USAR_TARJETA = True
 # reactiva el detector que la deja completa.
 TARJETA_SIEMPRE = True
 
+
 # Solo estas cuentas reciben el diseño de pantalla partida. Si más adelante
 # agregas una cuenta a ACCOUNTS, NO entra aquí sola: hay que revisarla
 # primero. Algunas cuentas (BetMGM, por ejemplo) marcan sus fotos con el
 # logo del patrocinador, y eso necesita un paso extra antes de usarlas.
+# @NFL_DovKleiman NO está aquí todavía, a propósito: publica muchas capturas
+# de pantalla de otros tweets, y partir una captura a la mitad la deja
+# ilegible. No pude calibrar un detector de capturas sin imágenes reales
+# suyas. Mientras tanto sus posts usan el diseño anterior, que funciona con
+# capturas y con fotos. En cuanto haya tweets suyos en la cola se revisa y
+# se agrega aquí.
 CUENTAS_TARJETA = ["NFL_Stats", "SleeperNFL"]
 
 TARJETA_PROPORCION_TEXTO = 0.52   # cuánto del ancho ocupa el panel de texto
 TARJETA_MARGEN       = 54
 TARJETA_TITULAR_MAX  = 86         # el titular se achica solo hasta que quepa
 TARJETA_TITULAR_MAX_SOLO = 112    # cuando el tweet no trae lista, cabe más grande
+
+# Diseño vertical: imagen completa al centro, titular arriba, logo abajo.
+# Es el que se usa cuando partir la imagen la arruinaría (gráficas que ya
+# traen sus datos, capturas de pantalla de otros tweets).
+VERTICAL_TITULAR_MAX   = 82
+VERTICAL_MAX_RENGLONES = 4
+VERTICAL_HUECO         = 30
+VERTICAL_SESGO_IMAGEN  = 0.68     # 0 = pegada al texto, 1 = pegada al logo
 TARJETA_TITULAR_MIN  = 40
 TARJETA_LISTA_MIN    = 32
 TARJETA_LISTA_RATIO  = 0.50       # tamaño de la lista respecto al titular
@@ -139,21 +172,6 @@ GRAFICA_DOMINIO  = 0.62    # fracción de la imagen que ocupan 6 colores
 GRAFICA_VARIEDAD = 0.22    # colores distintos entre píxeles
 GRAFICA_PLANICIE = 0.55    # fracción de píxeles idénticos a su vecino
 
-# ---------- Imagen 4:5 ----------
-CANVAS_W, CANVAS_H = 1080, 1350
-BG_COLOR     = "#0B1220"    # fondo liso de marca (solo si apagas el desenfoque)
-BLUR_BACKDROP   = True      # fondo = la misma imagen ampliada y desenfocada
-BLUR_RADIUS     = 55        # qué tan desenfocado
-BLUR_DARKEN     = 0.45      # 1.0 = sin oscurecer; más bajo = más contraste con la imagen
-BLUR_SATURATION = 0.80      # baja un poco el color del fondo
-EDGE_PAD        = 6         # grosor del borde que despega la imagen del fondo
-EDGE_COLOR      = "#FFFFFF"
-SIDE_MARGIN  = 40
-LOGO_PATH    = "assets/logo.png"
-LOGO_MAX_H   = 86
-LOGO_STRIP_H = 150          # franja inferior reservada para el logo
-PHASH_DISTANCE = 6          # umbral conservador: mejor dejar pasar una variante rara
-                            # que bloquear para siempre contenido nuevo bueno
 
 # ---------- Redactor con IA ----------
 # Un modelo escribe el caption a partir del texto del tweet: le pone gancho
