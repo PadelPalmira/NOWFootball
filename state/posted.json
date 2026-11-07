@@ -120,6 +120,21 @@
       "tasa": 84.4,
       "tweet_url": "https://x.com/NFL_DovKleiman/status/2118829529015926956",
       "ventana_h": 4
+    },
+    {
+      "at": "2026-11-07T02:13:12.208860+00:00",
+      "author": "NFL_Stats",
+      "fb_post_id": "100393491469174_1515492730637285",
+      "id": "2118862496308101405",
+      "image_url": "https://pbs.twimg.com/media/HWJkYInW4AA62xP.jpg?format=jpg&name=large",
+      "modo": "programado",
+      "phash": "34d64fc929c72d81",
+      "publica_en": "2026-11-07T02:36:12.208860+00:00",
+      "retweets": 4,
+      "score": 1.559,
+      "tasa": 16.2,
+      "tweet_url": "https://x.com/NFL_Stats/status/2118862496308101405",
+      "ventana_h": 2
     }
   ]
 }
