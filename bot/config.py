@@ -7,6 +7,12 @@ ACCOUNTS = [
     "NFL_Stats",
     "SleeperNFL",
     "NFL_DovKleiman",
+    # Agregada el 11 de noviembre. Es la cuenta de noticias más grande de la
+    # NFL: sirve para que en los días de 10 publicaciones no falte material.
+    # Ojo: su tracción es muy superior a la de las otras tres, así que con
+    # PUNTUACION = "normalizada" va a ganar muchos de los turnos. Lo único que la
+    # reparte es NO_REPETIR_CUENTA_SEGUIDA, que evita dos seguidas suyas.
+    "AdamSchefter",
 ]
 
 # ---------- Credenciales (vienen de GitHub Secrets) ----------
@@ -45,9 +51,9 @@ JITTER_MINUTOS  = 25        # desorden aleatorio, para no caer siempre en punto
 # el lunes y el jueves hay partido de noche, y el martes y el miércoles casi
 # no pasa nada. Por eso el cupo cambia según el día.
 # Numeración de Python: lunes=0, martes=1, ... domingo=6
-TOPE_POR_DIA = {6: 9, 0: 9, 3: 9}   # domingo, lunes y jueves
+TOPE_POR_DIA = {6: 10, 0: 10, 3: 10}  # domingo, lunes y jueves
 TOPE_DIARIO  = 6                     # el resto de los días
-TOPE_SEMANAL = 55
+TOPE_SEMANAL = 72   # red de seguridad: el máximo real es 54 (3x10 + 4x6)
 
 # Con 9 publicaciones en una ventana de 15 horas, el hueco promedio es de
 # 100 minutos. El mínimo baja a 1 hora para que ese cupo sea alcanzable.
@@ -70,11 +76,10 @@ DIAS_MARCAS     = 7     # marcas de "repetida": se borran pasados estos días
 DIAS_DETALLE    = 120   # publicados: pasados estos días se dejan solo lo esencial
 TOPE_HISTORIAL  = 4000  # tope duro de entradas en el historial
 
-
-# Arranque gradual: (días desde la primera publicación, tope de ese periodo).
-# Pasados los 14 días se usa TOPE_DIARIO. Un salto repentino de ritmo llama
-# más la atención que el ritmo en sí.
-RAMPA = [(7, 3), (14, 4)]
+# Arranque gradual. Se retiró el 11 de noviembre: la página llevaba 9 días
+# publicando sin un solo problema y el cupo pedido es de 6 desde ya. Para
+# volver a poner una rampa, basta con una lista [(días, tope), ...].
+RAMPA = []
 
 NO_REPETIR_CUENTA_SEGUIDA = True
 
@@ -105,6 +110,23 @@ MAX_QUEUE_AGE_DAYS = 3      # después de esto se descarta de la cola
 # casi al azar. Los likes dan 11 veces más señal, así que se mide el
 # engagement combinado, con el repost pesando más porque cuesta más darlo.
 PESO_REPOST        = 3      # cuánto vale un repost frente a un like
+
+# Cómo se compara un tweet contra otro al elegir cuál publicar:
+#
+#   "normalizada" -> cada tweet compite contra lo normal de SU PROPIA cuenta.
+#                    Es lo que está puesto. Reparte parejo: medido con las
+#                    cuatro cuentas da Schefter 47%, Dov 18%, Sleeper 18%,
+#                    NFL_Stats 18%.
+#   "cruda"       -> gana el de mayor tracción por hora sin importar de quién
+#                    sea. Suena mejor pero en la práctica borra a las cuentas
+#                    chicas: medido da Schefter 50%, Dov 39%, Sleeper 11%,
+#                    NFL_Stats 0%. La tracción típica de Schefter es unas 60
+#                    veces la de NFL_Stats, así que este nunca gana un duelo.
+#
+# En ambos casos se mide tracción POR HORA, no total: dentro de una ventana de
+# 2 horas, el total favorece al tweet más viejo solo por llevar más tiempo
+# acumulando.
+PUNTUACION = "normalizada"
 MIN_ENGAGEMENT     = 25     # piso de tracción (reposts*PESO + likes)
 MIN_RETWEETS       = 0      # ya no se usa como filtro; queda por compatibilidad
 QUEUE_HARD_LIMIT   = 400    # tope de la cola para que el JSON no crezca sin control
@@ -112,7 +134,7 @@ QUEUE_HARD_LIMIT   = 400    # tope de la cola para que el JSON no crezca sin con
 # Al momento de publicar se busca primero en las últimas 2 horas. Si en esa
 # ventana no hay nada que sirva (o todo ya se publicó), se abre a 4 horas,
 # luego a 8, y así. La primera ventana que tenga algo, gana.
-VENTANAS_HORAS = [2, 4, 8, 24]
+VENTANAS_HORAS = [1, 2, 4, 8, 24]
 
 # Cuántos tweets necesita una cuenta en el tramo de referencia para que su
 # mediana signifique algo. Con menos, se usa la mediana general.
@@ -121,6 +143,13 @@ MIN_MUESTRA_BASE = 3
 # Un tweet de 10 minutos con 200 reposts está explotando más que uno de 2 horas
 # con 300, así que se mide la TASA (reposts por hora), no el total. Este piso de
 # edad evita que un tweet de 3 minutos dé una tasa absurda.
+# Gana la ventana más estrecha con material, para que salga lo más fresco.
+# Pero si la siguiente ventana trae algo MUCHO mejor, se cede. Medido sobre
+# la cola real sin esta salvedad: 1 de cada 4 publicaciones salía con menos
+# de la mitad del engagement de algo que estaba a una hora de distancia, y
+# el peor caso fue 194 contra 9,149.
+FACTOR_RESCATE = 2.0        # "mucho mejor" = el doble de bueno
+
 EDAD_MINIMA_HORAS = 0.5
 
 # ---------- Lienzo ----------

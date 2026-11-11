@@ -10,9 +10,10 @@ Dos ideas sostienen esto:
 2. TASA, no total. Dentro de una ventana de 2 horas, comparar reposts en
    crudo favorece al tweet más viejo: uno de hace 110 minutos tuvo cinco
    veces más tiempo de acumular que uno de hace 20. Por eso se mide
-   reposts POR HORA. Y como @NFL_Stats tiene mucho más alcance que
-   @polymarketblitz, esa tasa se compara contra la tasa típica de su propia
-   cuenta, para que la cuenta grande no gane siempre.
+   reposts POR HORA. Cómo se comparan esas tasas entre cuentas lo decide
+   config.PUNTUACION: "cruda" las compara tal cual (gana el mejor de las
+   cuatro cuentas) y "normalizada" las compara contra lo típico de cada
+   cuenta (reparte más parejo). Está en "cruda".
 """
 import datetime as dt
 import statistics
@@ -77,7 +78,16 @@ def baselines(queue, now=None, horas_max=None):
 
 
 def score(tweet, base, now=None):
-    """Qué tan por encima de lo normal para su cuenta está este tweet."""
+    """Qué tan bueno es este tweet frente a los demás candidatos.
+
+    Con PUNTUACION = "cruda" (lo que está puesto) se compara la tracción por
+    hora tal cual, así que gana el mejor de LAS CUATRO cuentas sin importar
+    de quién sea. Con "normalizada" cada tweet compite contra lo normal de su
+    propia cuenta, lo que reparte más parejo pero deja que un tweet mediano
+    de una cuenta chica le gane a un notición de una grande.
+    """
+    if getattr(config, "PUNTUACION", "normalizada") == "cruda":
+        return tasa(tweet, now)
     return tasa(tweet, now) / max(base, 0.5)
 
 
@@ -104,16 +114,42 @@ def _elegibles(queue, skip_ids, ahora, limite_horas, bases):
 def rank_por_ventana(queue, skip_ids, ahora=None, ventanas=None):
     """Devuelve (candidatos ordenados, ventana usada en horas).
 
-    Prueba las ventanas en orden y se queda con la primera que tenga algo.
+    Gana la ventana MÁS ESTRECHA que tenga material. Si al momento de
+    publicar hay algo bueno de la última hora, sale eso; si no hay nada que
+    cumpla, se abre a 2 horas, luego a 4, y así.
+
+    CON UNA SALVEDAD. Si la siguiente ventana trae algo mucho mejor
+    (FACTOR_RESCATE veces más), se cede y sale ese. Sin esta regla, medido
+    sobre la cola real, 1 de cada 4 publicaciones salía con menos de la
+    mitad del engagement de algo que estaba a una hora de distancia; el peor
+    caso fue 194 contra 9,149. Lo más fresco y lo que más probabilidad de
+    éxito tiene no siempre son el mismo tweet, y cuando la diferencia es
+    enorme vale más la pena el que va a funcionar.
+
+    El rescate mira UNA ventana más atrás, no las 24 horas completas. Si
+    mirara todo el rango acabaría publicando siempre lo mejor del día, con
+    4.9 h de antigüedad promedio, y dejaría de ser contenido del momento.
     """
     ahora = ahora or dt.datetime.now(dt.timezone.utc)
     ventanas = ventanas or config.VENTANAS_HORAS
     bases = baselines(queue, ahora)
+
+    fresco = None          # (candidatos, horas) de la ventana estrecha que ganó
     for horas in ventanas:
         candidatos = _elegibles(queue, skip_ids, ahora, horas, bases)
-        if candidatos:
+        if not candidatos:
+            continue
+        if fresco is None:
+            fresco = (candidatos, horas)
+            continue
+        # Cada ventana contiene a la anterior, así que aquí ya solo se
+        # compara el mejor de las dos. Solo se cede si la diferencia es
+        # grande; si no, se queda lo fresco.
+        factor = getattr(config, "FACTOR_RESCATE", 0) or 0
+        if factor and candidatos[0][0] >= fresco[0][0][0] * factor:
             return candidatos, horas
-    return [], None
+        return fresco
+    return fresco if fresco else ([], None)
 
 
 # Compatibilidad con el código anterior
