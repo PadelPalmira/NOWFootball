@@ -128,67 +128,38 @@ CANVAS_W, CANVAS_H = 1080, 1350
 LOGO_PATH    = "assets/logo.png"
 PHASH_DISTANCE = 6
 
-# ---------- Tarjeta (pantalla partida) ----------
-# Diseño: foto a la derecha con halo de neón, titular y lista a la izquierda.
-USAR_TARJETA = True
+# ---------- Tarjeta ----------
+# Hay UN SOLO diseño: fondo blanco, titular arriba, imagen completa al
+# centro y el logo en una franja oscura abajo.
+#
+# Se eliminaron los dos diseños anteriores:
+#   - La pantalla partida recortaba tanto la imagen que el post ya no se
+#     parecía al original (un meme de "TRASH vs GARBAGE" acababa mostrando
+#     "H GAR" y medio bote de basura).
+#   - El vertical oscuro se quitó para que la página se vea pareja: un solo
+#     formato es más reconocible que dos conviviendo.
+# Por eso ya no existen CUENTAS_TARJETA ni el detector de gráficas: todas
+# las cuentas reciben el mismo trato y ninguna imagen se recorta nunca.
 
-# El formato de tarjeta es el estándar para TODO lo que publican las cuentas
-# aprobadas, sin importar el tema. Si alguna vez sale una imagen que ya es
-# una gráfica de estadísticas y se ve partida a la mitad, poner esto en False
-# reactiva el detector que la deja completa.
-TARJETA_SIEMPRE = True
+TARJETA_MARGEN      = 54
+TARJETA_TITULAR_MIN = 40
+TARJETA_INTERLINEA  = 0.98        # Anton se ve mejor con los renglones pegados
 
+BLANCO_TITULAR_MAX   = 78         # el titular se achica solo hasta que quepa
+BLANCO_MAX_RENGLONES = 3
 
-# Solo estas cuentas reciben el diseño de pantalla partida. Si más adelante
-# agregas una cuenta a ACCOUNTS, NO entra aquí sola: hay que revisarla
-# primero. Algunas cuentas (BetMGM, por ejemplo) marcan sus fotos con el
-# logo del patrocinador, y eso necesita un paso extra antes de usarlas.
-# @NFL_DovKleiman NO está aquí todavía, a propósito: publica muchas capturas
-# de pantalla de otros tweets, y partir una captura a la mitad la deja
-# ilegible. No pude calibrar un detector de capturas sin imágenes reales
-# suyas. Mientras tanto sus posts usan el diseño anterior, que funciona con
-# capturas y con fotos. En cuanto haya tweets suyos en la cola se revisa y
-# se agrega aquí.
-CUENTAS_TARJETA = ["NFL_Stats", "SleeperNFL"]
+# El logo: antes decía 54 pero se VEÍA en 32. El archivo del logo trae mucho
+# aire transparente alrededor, y al escalarlo tal cual ese aire se contaba
+# como parte del alto. Ahora el dibujo se recorta primero, así que el número
+# de aquí es el alto que de verdad se ve.
+BLANCO_LOGO_ALTO = 118
+BLANCO_FRANJA    = 190            # alto de la franja oscura que lo contiene
 
-TARJETA_PROPORCION_TEXTO = 0.52   # cuánto del ancho ocupa el panel de texto
-TARJETA_MARGEN       = 54
-TARJETA_TITULAR_MAX  = 86         # el titular se achica solo hasta que quepa
-TARJETA_TITULAR_MAX_SOLO = 112    # cuando el tweet no trae lista, cabe más grande
-
-# Diseño vertical: imagen completa al centro, titular arriba, logo abajo.
-# Es el que se usa cuando partir la imagen la arruinaría (gráficas que ya
-# traen sus datos, capturas de pantalla de otros tweets).
-VERTICAL_TITULAR_MAX   = 82
-VERTICAL_MAX_RENGLONES = 4
-VERTICAL_HUECO         = 30
-VERTICAL_SESGO_IMAGEN  = 0.68     # 0 = pegada al texto, 1 = pegada al logo
-TARJETA_TITULAR_MIN  = 40
-TARJETA_LISTA_MIN    = 32
-TARJETA_LISTA_RATIO  = 0.50       # tamaño de la lista respecto al titular
-TARJETA_LOGO_ALTO    = 54
-TARJETA_AURA         = True
-TARJETA_AURA_RADIO   = 14
-TARJETA_AURA_FUERZA  = 0.55
-TARJETA_GLOW_RADIO   = 13
-TARJETA_GLOW_FUERZA  = 1.25        # qué tan encendido queda el neón
-TARJETA_INTERLINEA   = 0.98       # Anton se ve mejor con los renglones pegados
-TARJETA_HUECO_LISTA  = 46         # aire entre el titular y la lista
-TARJETA_SESGO_VERTICAL = 0.42     # 0 = pegado arriba, 1 = pegado abajo
-
-COLOR_FONDO_1 = "#0A1020"         # arriba del degradado
-COLOR_FONDO_2 = "#141C33"         # abajo
 COLOR_TEXTO   = "#FFFFFF"
-COLOR_RESALTE        = "#FF1F6E"  # el halo del neón
-COLOR_RESALTE_NUCLEO = "#FF8FBE"  # el núcleo, más claro, para que se lea
-COLOR_LISTA   = "#D8DEEC"
-COLOR_AURA    = "#FF2D78"
-
-# Detector de foto vs tarjeta de estadísticas. Se marca como gráfica cuando
-# se cumplen al menos dos de los tres criterios.
-GRAFICA_DOMINIO  = 0.62    # fracción de la imagen que ocupan 6 colores
-GRAFICA_VARIEDAD = 0.22    # colores distintos entre píxeles
-GRAFICA_PLANICIE = 0.55    # fracción de píxeles idénticos a su vecino
+COLOR_TINTA   = "#0F1018"         # el titular sobre blanco
+COLOR_RESALTE = "#FF1F6E"         # las palabras resaltadas, rosa de la marca
+COLOR_FRANJA  = "#12141F"         # la franja del logo
+BLANCO_FILO   = "#E4E8F0"         # filo tenue alrededor de la imagen
 
 
 # ---------- Redactor con IA ----------

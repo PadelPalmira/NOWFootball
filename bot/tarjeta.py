@@ -34,85 +34,6 @@ def titular(tam):
     return _fuente("Anton-Regular.ttf", tam)
 
 
-def lista_fuente(tam):
-    return _fuente("BarlowCondensed-Bold.ttf", tam)
-
-
-# ----------------------------------------------------------------- la foto
-
-def _cubrir(img, w, h, foco_y=0.38):
-    """Escala y recorta para llenar w x h. foco_y decide qué parte se
-    conserva al recortar en vertical: 0.38 deja la cara arriba, que es donde
-    suele estar en una foto deportiva."""
-    sw, sh = img.size
-    escala = max(w / sw, h / sh)
-    nw, nh = max(1, int(sw * escala)), max(1, int(sh * escala))
-    img = img.resize((nw, nh), Image.LANCZOS)
-    izq = max(0, (nw - w) // 2)
-    arriba = max(0, min(int((nh - h) * foco_y), nh - h))
-    return img.crop((izq, arriba, izq + w, arriba + h))
-
-
-def _aura(panel, color):
-    """Borde de luz de neón alrededor del sujeto.
-
-    Sin un modelo de segmentación no se puede recortar al jugador. Pero en
-    una foto deportiva el sujeto es casi siempre lo más brillante, así que se
-    toma esa zona, se le saca el CONTORNO (dilatar menos erosionar) y se
-    ilumina solo ahí. Teñir toda la zona brillante, que fue el primer
-    intento, dejaba al jugador rosa.
-    """
-    gris = panel.convert("L")
-    brillo = gris.point(lambda v: 255 if v > 145 else 0)
-    contorno = ImageChops.difference(brillo.filter(ImageFilter.MaxFilter(9)),
-                                     brillo.filter(ImageFilter.MinFilter(9)))
-    contorno = contorno.filter(ImageFilter.GaussianBlur(config.TARJETA_AURA_RADIO))
-    capa = Image.new("RGB", panel.size, color)
-    capa.putalpha(contorno.point(
-        lambda v: int(v * config.TARJETA_AURA_FUERZA)))
-    base = panel.convert("RGBA")
-    base.alpha_composite(capa)
-    return ImageChops.screen(panel, Image.composite(
-        Image.new("RGB", panel.size, color), Image.new("RGB", panel.size, (0, 0, 0)),
-        contorno.point(lambda v: int(v * config.TARJETA_AURA_FUERZA))))
-
-
-def panel_foto(img, w, h):
-    panel = _cubrir(img.convert("RGB"), w, h)
-    panel = ImageEnhance.Contrast(panel).enhance(1.12)
-    panel = ImageEnhance.Color(panel).enhance(1.15)
-    if config.TARJETA_AURA:
-        panel = _aura(panel, config.COLOR_AURA)
-    return panel
-
-
-# ------------------------------------------------------------ el fondo izq
-
-def _fondo(w, h):
-    """Degradado oscuro con unas luces desenfocadas, como un estadio."""
-    base = Image.new("RGB", (w, h), config.COLOR_FONDO_2)
-    grad = Image.new("L", (1, h))
-    for y in range(h):
-        grad.putpixel((0, y), int(255 * (y / max(h - 1, 1)) ** 0.85))
-    grad = grad.resize((w, h))
-    base = Image.composite(Image.new("RGB", (w, h), config.COLOR_FONDO_2),
-                           Image.new("RGB", (w, h), config.COLOR_FONDO_1), grad)
-
-    luces = Image.new("RGB", (w, h), (0, 0, 0))
-    d = ImageDraw.Draw(luces)
-    import random
-    rng = random.Random(7)
-    for _ in range(26):
-        x, y = rng.randrange(w), rng.randrange(int(h * 0.42))
-        r = rng.randrange(5, 17)
-        tono = rng.choice([(255, 236, 190), (190, 215, 255), (255, 210, 170)])
-        d.ellipse([x - r, y - r, x + r, y + r], fill=tono)
-    luces = luces.filter(ImageFilter.GaussianBlur(13))
-    return Image.blend(base, Image.blend(base, luces, 0.5), 0.5)
-
-
-# --------------------------------------------------------------- el texto
-
 def _ancho(draw, texto, fuente):
     return draw.textbbox((0, 0), texto, font=fuente)[2]
 
@@ -184,48 +105,6 @@ def _desborda(draw, renglones, fuente, max_ancho):
     return False
 
 
-def _capa_glow(size, renglones, fuente, x, y0, alto_renglon, espacio):
-    """Todas las palabras resaltadas en una sola capa, para fundirla de golpe.
-
-    Se funde con modo PANTALLA (aditivo): así el resplandor solo ilumina y
-    nunca oscurece lo que hay debajo. Mezclarla de forma normal, que fue el
-    primer intento, apagaba el texto en vez de encenderlo.
-    """
-    capa = Image.new("RGB", size, (0, 0, 0))
-    d = ImageDraw.Draw(capa)
-    y = y0
-    hay = False
-    for renglon in renglones:
-        cursor = x
-        for palabra, resaltada in renglon:
-            w = d.textbbox((0, 0), palabra, font=fuente)[2]
-            if resaltada:
-                d.text((cursor, y), palabra, font=fuente, fill=config.COLOR_RESALTE)
-                hay = True
-            cursor += w + espacio
-        y += alto_renglon
-    if not hay:
-        return None
-    capa = capa.filter(ImageFilter.GaussianBlur(config.TARJETA_GLOW_RADIO))
-    return ImageEnhance.Brightness(capa).enhance(config.TARJETA_GLOW_FUERZA)
-
-
-def _dibuja_texto(draw, renglones, fuente, x, y0, alto_renglon, espacio):
-    """Dibuja el titular nítido encima del resplandor."""
-    y = y0
-    for renglon in renglones:
-        cursor = x
-        for palabra, resaltada in renglon:
-            w = draw.textbbox((0, 0), palabra, font=fuente)[2]
-            # El núcleo va más claro que el halo: así se lee como neón de
-            # verdad en vez de como una mancha de color.
-            draw.text((cursor, y), palabra, font=fuente,
-                      fill=config.COLOR_RESALTE_NUCLEO if resaltada
-                      else config.COLOR_TEXTO)
-            cursor += w + espacio
-        y += alto_renglon
-
-
 def _marca_resaltadas(titulo, resaltar):
     """Convierte el titular en [(palabra, resaltada)] según las frases a
     resaltar."""
@@ -245,117 +124,6 @@ def _marca_resaltadas(titulo, resaltar):
 
 # ------------------------------------------------------------------ armado
 
-def componer(foto, titulo, resaltar=None, lista=None, logo_path=None):
-    """Devuelve la tarjeta 4:5 lista para publicar."""
-    W, H = config.CANVAS_W, config.CANVAS_H
-    ancho_txt = int(W * config.TARJETA_PROPORCION_TEXTO)
-    ancho_foto = W - ancho_txt
-    margen = config.TARJETA_MARGEN
-
-    lienzo = Image.new("RGB", (W, H), config.COLOR_FONDO_1)
-    lienzo.paste(_fondo(ancho_txt, H), (0, 0))
-    lienzo.paste(panel_foto(foto, ancho_foto, H), (ancho_txt, 0))
-
-    d = ImageDraw.Draw(lienzo)
-
-    util = ancho_txt - margen * 2
-    lista = [l for l in (lista or []) if l.strip()]
-
-    # Sin lista hay más espacio, así que el titular puede arrancar más grande
-    tope = (config.TARJETA_TITULAR_MAX if lista
-            else config.TARJETA_TITULAR_MAX_SOLO)
-
-    marcadas = _marca_resaltadas(titulo, resaltar)
-    for tam in range(tope, config.TARJETA_TITULAR_MIN - 1, -2):
-        f = titular(tam)
-        renglones = _acomoda(d, marcadas, f, util)
-        alto_renglon = int(tam * config.TARJETA_INTERLINEA)
-        alto_t = len(renglones) * alto_renglon
-        tam_l = max(config.TARJETA_LISTA_MIN, int(tam * config.TARJETA_LISTA_RATIO))
-        alto_fila = int(tam_l * 1.45)
-        alto_l = (len(lista) * alto_fila + config.TARJETA_HUECO_LISTA) if lista else 0
-        cabe_alto = alto_t + alto_l <= H - margen * 2 - config.TARJETA_LOGO_ALTO - 30
-        if cabe_alto and not _desborda(d, renglones, f, util):
-            break
-
-    # El bloque va centrado verticalmente, con un sesgo hacia arriba
-    libre = H - margen * 2 - config.TARJETA_LOGO_ALTO - 30 - (alto_t + alto_l)
-    y0 = margen + int(libre * config.TARJETA_SESGO_VERTICAL)
-    espacio = _ancho(d, " ", f)
-
-    glow = _capa_glow(lienzo.size, renglones, f, margen, y0, alto_renglon, espacio)
-    if glow is not None:
-        lienzo = ImageChops.screen(lienzo, glow)
-    d = ImageDraw.Draw(lienzo)
-    d.rectangle([ancho_txt - 4, 0, ancho_txt, H], fill=config.COLOR_RESALTE)
-
-    _dibuja_texto(d, renglones, f, margen, y0, alto_renglon, espacio)
-
-    if lista:
-        y = y0 + alto_t + config.TARJETA_HUECO_LISTA
-        fl = lista_fuente(tam_l)
-        for fila in lista:
-            d.text((margen, y), fila.upper(), font=fl, fill=config.COLOR_LISTA)
-            y += alto_fila
-
-    if logo_path and os.path.exists(logo_path):
-        try:
-            logo = Image.open(logo_path).convert("RGBA")
-            lw, lh = logo.size
-            esc = min(config.TARJETA_LOGO_ALTO / lh, (ancho_txt * 0.5) / lw)
-            logo = logo.resize((max(1, int(lw * esc)), max(1, int(lh * esc))),
-                               Image.LANCZOS)
-            lienzo.paste(logo, (margen, H - margen - logo.size[1]), logo)
-        except Exception:
-            pass
-
-    return lienzo
-
-
-# ------------------------------------------------- ¿foto o gráfica de stats?
-
-def _senales(img):
-    """Mide qué tan 'plana' es una imagen.
-
-    Una tarjeta de estadísticas tiene fondos lisos, pocos colores y bordes
-    duros. Una foto tiene degradados, ruido y muchísimos colores.
-    """
-    chica = img.convert("RGB").resize((160, 160), Image.LANCZOS)
-    # Cuantizar y ver qué tanto domina un puñado de colores
-    q = chica.quantize(colors=64, method=Image.MEDIANCUT).convert("RGB")
-    cuenta = sorted((c for c, _ in q.getcolors(160 * 160)), reverse=True)
-    total = 160 * 160
-    dominio = sum(cuenta[:6]) / total          # 1.0 = todo son 6 colores
-    distintos = len(chica.getcolors(maxcolors=160 * 160) or [])
-    # Planicie local: qué fracción de píxeles es idéntica a su vecino
-    gris = chica.convert("L")
-    bordes = ImageChops.difference(gris, gris.filter(ImageFilter.MinFilter(3)))
-    hist = bordes.histogram()
-    plano = sum(hist[:3]) / total
-    return dominio, distintos / total, plano
-
-
-def es_grafica(img):
-    """True si la imagen parece una tarjeta de estadísticas y no una foto.
-
-    Ante la duda se responde que SÍ es gráfica, porque los costos del error
-    no son simétricos: tratar una gráfica como foto la parte a la mitad y la
-    vuelve ilegible, mientras que tratar una foto como gráfica solo hace que
-    se use el diseño anterior, que se ve bien.
-    """
-    try:
-        dominio, variedad, plano = _senales(img)
-    except Exception:
-        return True
-    puntos = 0
-    if dominio > config.GRAFICA_DOMINIO:   puntos += 1
-    if variedad < config.GRAFICA_VARIEDAD: puntos += 1
-    if plano > config.GRAFICA_PLANICIE:    puntos += 1
-    return puntos >= 2
-
-
-# ------------------------------------------- diseño vertical (imagen entera)
-
 def _contener(img, w, h):
     """Escala para que la imagen quepa COMPLETA en w x h, sin recortar nada."""
     sw, sh = img.size
@@ -363,91 +131,112 @@ def _contener(img, w, h):
     return img.resize((max(1, int(sw * escala)), max(1, int(sh * escala))),
                       Image.LANCZOS)
 
+# ------------------------------------------------------------------ armado
 
-def componer_vertical(foto, titulo, resaltar=None, logo_path=None):
-    """Tarjeta 4:5 con la imagen COMPLETA al centro, el titular arriba y el
-    logo abajo.
+BLANCO = (255, 255, 255)
 
-    Es el diseño para cuando partir la imagen la arruinaría: gráficas de
-    estadísticas que ya traen sus datos, y capturas de pantalla de otros
-    tweets. La imagen nunca se recorta ni se parte, y el titular le pone
-    arriba el contexto con la misma tipografía y el mismo neón que la
-    tarjeta de pantalla partida, para que la página se vea pareja.
+
+def _logo_ajustado(logo_path, alto):
+    """Logo recortado a su dibujo real y escalado a `alto` de verdad.
+
+    El archivo del logo es de 2048x2048 pero el dibujo solo ocupa el centro:
+    alrededor hay aire transparente. Escalar el archivo tal cual dejaba el
+    logo VISIBLE en unos 32 px aunque la config dijera 54. Por eso se veía
+    casi indistinguible. Recortando el aire primero, el alto que se pide es
+    el alto que se ve.
+    """
+    if not logo_path or not os.path.exists(logo_path):
+        return None
+    try:
+        im = Image.open(logo_path).convert("RGBA")
+    except Exception:
+        return None
+    caja = im.getchannel("A").getbbox()
+    if caja:
+        im = im.crop(caja)
+    w, h = im.size
+    if w <= 0 or h <= 0:
+        return None
+    return im.resize((max(1, int(w * alto / h)), max(1, alto)), Image.LANCZOS)
+
+
+def componer_blanco(foto, titulo, resaltar=None, logo_path=None):
+    """El diseño de Now Football: fondo blanco, titular arriba, imagen
+    completa al centro y el logo en una franja oscura abajo.
+
+    Es el ÚNICO diseño. La imagen nunca se recorta ni se parte: se escala
+    hasta donde quepa y lo que sobra queda en blanco.
+
+    Por qué así:
+
+    - Se eliminó la pantalla partida. Recortaba tanto la imagen que el post
+      ya no se parecía al original: un meme de "TRASH vs GARBAGE" acababa
+      mostrando "H GAR" y medio bote de basura.
+    - Se eliminó el vertical oscuro para que la página se vea pareja: un
+      solo formato es más reconocible que dos.
+    - La franja de abajo es oscura a propósito. El logo de Now Football es
+      blanco con el balón de color, así que sobre el lienzo blanco
+      desaparecía por completo. La franja le da el contraste que necesita y
+      de paso cierra la tarjeta.
     """
     W, H = config.CANVAS_W, config.CANVAS_H
     margen = config.TARJETA_MARGEN
     util = W - margen * 2
 
-    lienzo = _fondo(W, H)
+    lienzo = Image.new("RGB", (W, H), BLANCO)
     d = ImageDraw.Draw(lienzo)
 
-    logo = None
-    if logo_path and os.path.exists(logo_path):
-        try:
-            logo = Image.open(logo_path).convert("RGBA")
-        except Exception:
-            logo = None
-    alto_logo = config.TARJETA_LOGO_ALTO if logo else 0
+    logo = _logo_ajustado(logo_path, config.BLANCO_LOGO_ALTO)
+    franja = config.BLANCO_FRANJA if logo else margen
 
-    # El titular se achica hasta ocupar como mucho unos renglones
-    marcadas = _marca_resaltadas(titulo, resaltar)
-    for tam in range(config.VERTICAL_TITULAR_MAX, config.TARJETA_TITULAR_MIN - 1, -2):
-        f = titular(tam)
-        renglones = _acomoda(d, marcadas, f, util)
-        alto_renglon = int(tam * config.TARJETA_INTERLINEA)
-        alto_t = len(renglones) * alto_renglon
-        if (len(renglones) <= config.VERTICAL_MAX_RENGLONES
-                and not _desborda(d, renglones, f, util)):
-            break
+    # El titular se achica solo hasta que quepa en los renglones permitidos.
+    renglones, f, alto_renglon, alto_t = [], None, 0, 0
+    if titulo:
+        marcadas = _marca_resaltadas(titulo, resaltar)
+        for tam in range(config.BLANCO_TITULAR_MAX, config.TARJETA_TITULAR_MIN - 1, -2):
+            f = titular(tam)
+            renglones = _acomoda(d, marcadas, f, util)
+            alto_renglon = int(tam * config.TARJETA_INTERLINEA)
+            alto_t = len(renglones) * alto_renglon
+            if (len(renglones) <= config.BLANCO_MAX_RENGLONES
+                    and not _desborda(d, renglones, f, util)):
+                break
 
-    # El titular se ancla arriba y el logo abajo; la imagen se queda con
-    # todo el espacio de en medio. Centrar el bloque completo dejaba al logo
-    # flotando a media altura y se veía desbalanceado.
-    hueco = config.VERTICAL_HUECO
+    bloque_texto = alto_t + margen if titulo else 0
+    disponible = max(H - franja - margen - bloque_texto, 80)
+
+    img = _contener(foto.convert("RGB"), W, disponible)
+    sobra = max(0, (disponible - img.size[1]) // 2)
     y_texto = margen
-    y_logo = H - margen - alto_logo
-    caja_alto = y_logo - (y_texto + alto_t) - hueco * 2
+    y_img = margen + bloque_texto + sobra
+    x_img = (W - img.size[0]) // 2
+    lienzo.paste(img, (x_img, y_img))
 
-    # La imagen NO lleva el aura de neón aquí: este diseño se usa sobre todo
-    # para gráficas y capturas, y teñirles los bordes de rosa las ensucia.
-    #
-    # Va a TODO el ancho del lienzo, sin margen lateral. Una imagen
-    # apaisada metida en un marco 4:5 nunca va a llenar el alto, pero
-    # dejarle además margen a los lados la encoge todavía más y la deja
-    # viéndose como una estampilla en medio del hueco.
-    img = _contener(foto.convert("RGB"), W, max(caja_alto, 80))
-
-    espacio = _ancho(d, " ", f)
-    glow = _capa_glow(lienzo.size, renglones, f, margen, y_texto, alto_renglon, espacio)
-    if glow is not None:
-        lienzo = ImageChops.screen(lienzo, glow)
-    d = ImageDraw.Draw(lienzo)
-    _dibuja_texto(d, renglones, f, margen, y_texto, alto_renglon, espacio)
-
-    # La imagen se recarga hacia abajo dentro de su hueco. El aire queda
-    # debajo del titular, donde el fondo con luces se ve a propósito, en vez
-    # de quedar entre la imagen y el logo, donde se ve como un olvido.
-    x = (W - img.size[0]) // 2
-    sobra = max(0, caja_alto - img.size[1])
-    y = y_texto + alto_t + hueco + int(sobra * config.VERTICAL_SESGO_IMAGEN)
-
+    # Filo tenue para que una imagen de fondo claro no se funda con el lienzo.
+    filo = config.BLANCO_FILO
     if img.size[0] >= W:
-        # Sangra de lado a lado: solo líneas arriba y abajo, porque un marco
-        # completo dejaría dos rayas sueltas en los bordes del lienzo.
-        d.rectangle([0, y - 3, W, y - 1], fill=config.COLOR_RESALTE)
-        d.rectangle([0, y + img.size[1] + 1, W, y + img.size[1] + 3],
-                    fill=config.COLOR_RESALTE)
+        d.rectangle([0, y_img, W, y_img], fill=filo)
+        d.rectangle([0, y_img + img.size[1] - 1, W, y_img + img.size[1] - 1], fill=filo)
     else:
-        d.rectangle([x - 2, y - 2, x + img.size[0] + 1, y + img.size[1] + 1],
-                    outline=config.COLOR_RESALTE, width=2)
-    lienzo.paste(img, (x, y))
+        d.rectangle([x_img, y_img, x_img + img.size[0] - 1,
+                     y_img + img.size[1] - 1], outline=filo, width=1)
+
+    # El titular va en tinta oscura; lo resaltado, en el rosa de la marca.
+    # Aquí NO va el neón encendido: el glow se hizo para fondo oscuro y
+    # sobre blanco solo ensucia las letras.
+    if titulo and f is not None:
+        espacio = _ancho(d, " ", f)
+        y = y_texto
+        for renglon in renglones:
+            x = margen
+            for palabra, resaltada in renglon:
+                d.text((x, y), palabra, font=f,
+                       fill=config.COLOR_RESALTE if resaltada else config.COLOR_TINTA)
+                x += _ancho(d, palabra, f) + espacio
+            y += alto_renglon
 
     if logo:
-        lw, lh = logo.size
-        esc = min(alto_logo / lh, (W * 0.42) / lw)
-        logo = logo.resize((max(1, int(lw * esc)), max(1, int(lh * esc))),
-                           Image.LANCZOS)
+        d.rectangle([0, H - franja, W, H], fill=config.COLOR_FRANJA)
         lienzo.paste(logo, ((W - logo.size[0]) // 2,
-                            y_logo + (alto_logo - logo.size[1]) // 2), logo)
-
+                            H - franja + (franja - logo.size[1]) // 2), logo)
     return lienzo

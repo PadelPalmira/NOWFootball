@@ -28,59 +28,33 @@ def download(url, timeout=45):
 
 
 def build(url, out_path, logo_path=None, texto=None, autor=None, verboso=False):
-    """Descarga la imagen y arma la publicación.
+    """Descarga la imagen del tweet y arma la tarjeta 4:5 de Now Football.
 
-    Si la imagen es una FOTO, se arma la tarjeta de pantalla partida con el
-    texto a la izquierda. Si ya es una GRÁFICA de estadísticas, partirla la
-    volvería ilegible, así que se usa el diseño vertical: la imagen entera
-    al centro, el titular arriba y el logo abajo.
+    Devuelve (ruta_de_la_tarjeta, imagen_original). La original se devuelve
+    SIN TOCAR porque es sobre ella que se calcula la huella que impide
+    republicar: si se calculara sobre la tarjeta ya armada, cambiar el
+    diseño haría que todo el historial dejara de reconocerse.
 
-    Devuelve (ruta, imagen_original_sin_tocar). La original se devuelve sin
-    tocar porque es la que se usa para detectar repetidas: así la huella no
-    cambia aunque cambie el diseño.
+    Ya no hay que decidir entre diseños. Todas las cuentas reciben la misma
+    tarjeta blanca y la imagen nunca se recorta.
     """
     original = download(url)
-    logo = logo_path if logo_path is not None else config.LOGO_PATH
 
-    aprobada = (autor or "").lstrip("@").lower() in {
-        c.lstrip("@").lower() for c in config.CUENTAS_TARJETA}
-
-    usar_tarjeta = False
-    motivo = ""
-    if not config.USAR_TARJETA:
-        motivo = "la tarjeta está apagada en config"
-    elif not aprobada:
-        motivo = f"@{autor} no está en CUENTAS_TARJETA"
-    elif not texto:
-        motivo = "el tweet no trae texto"
-    else:
-        titulo, lista, _ = estructura.analiza(texto)
-        if not titulo:
-            motivo = "no se pudo sacar un titular"
-        elif not config.TARJETA_SIEMPRE and tarjeta.es_grafica(original):
-            motivo = "la imagen ya es una gráfica, se deja completa"
-        else:
-            usar_tarjeta = True
-
-    if usar_tarjeta:
+    titulo, _lista, _cola = estructura.analiza(texto or "")
+    resaltar, nota = (None, "sin titular")
+    if titulo:
         resaltar, nota = redactor.resaltado(titulo)
-        if verboso:
-            print(f"    Imagen: pantalla partida · {nota}")
-        armada = tarjeta.componer(original, titulo, resaltar, lista, logo)
-    else:
-        # Diseño vertical: la imagen entera, con el titular arriba y el logo
-        # abajo. Nunca se recorta ni se parte, así que sirve igual para una
-        # gráfica de estadísticas que para una captura de pantalla.
-        titulo2, _, _ = estructura.analiza(texto or "")
-        if titulo2:
-            resaltar, nota = redactor.resaltado(titulo2)
-            if verboso:
-                print(f"    Imagen: vertical, imagen completa · {motivo} · {nota}")
-            armada = tarjeta.componer_vertical(original, titulo2, resaltar, logo)
-        else:
-            if verboso:
-                print(f"    Imagen: vertical sin titular · {motivo}")
-            armada = tarjeta.componer_vertical(original, "", None, logo)
+        if not resaltar:
+            resaltar = estructura.resalte_por_reglas(titulo)
+            nota = "reglas"
 
-    armada.save(out_path, "JPEG", quality=90, optimize=True)
+    if verboso:
+        if titulo:
+            print(f"    Imagen: tarjeta blanca · resaltado por {nota}")
+        else:
+            print("    Imagen: tarjeta blanca · el tweet no trae titular")
+
+    armada = tarjeta.componer_blanco(original, titulo or "", resaltar,
+                                     logo_path or config.LOGO_PATH)
+    armada.save(out_path, "JPEG", quality=92, optimize=True)
     return out_path, original
