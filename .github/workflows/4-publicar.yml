@@ -8,22 +8,31 @@ name: 4. Publicar en Now Football
 # Facebook entre 20 y 40 minutos después, no lo publica de inmediato. Ese es
 # el rato que tienes para verlo o cancelarlo en Meta Business Suite.
 #
-# POR QUÉ HAY TANTOS TURNOS Y A MINUTOS RAROS (cambio de la v1.15):
+# POR QUÉ HAY TANTOS TURNOS Y A MINUTOS RAROS:
 # el reloj de GitHub es "lo mejor que se pueda", no una garantía. Cuando está
 # cargado avisa tarde o se come el turno, y lo que más se congestiona es la
-# hora en punto y la media hora. Antes todos los turnos caían justo ahí y en
-# la práctica solo llegaba 1 de cada 3. Ahora caen en minutos sueltos (07, 29
-# y 47) y hay más turnos, para que siempre llegue alguno.
+# hora en punto y la media hora. Por eso los turnos caen en minutos sueltos
+# (07, 27 y 47) y hay TRES POR HORA: con que llegue uno de los tres, esa
+# hora ya tuvo su oportunidad.
+#
+# Son tres por hora desde la v1.17, porque el cupo subió a 10 los domingos,
+# lunes y jueves. Diez publicaciones separadas mínimo una hora necesitan que
+# casi cada hora de la ventana (8am a 11pm) tenga un turno que sí llegue.
+# Simulado con el reloj comiéndose la mitad de los turnos:
+#     1 por hora -> 6.4 de 10        2 por hora -> 7.9 de 10
+#     3 por hora -> 9.0 de 10        4 por hora -> 9.5 de 10
+# El cuarto turno casi no agrega y en cambio se come los minutos gratis de
+# GitHub, así que se quedó en tres.
 #
 # Despertar no cuesta llamadas a X: si el freno de ritmo dice que no toca,
 # la corrida termina antes de consultar nada.
 
 on:
   schedule:
-    # Hora de Mazatlán (UTC−7). Entre las 8:07 y las 21:29.
-    - cron: '7 15,17,19,21,23,1,3 * * *'
-    - cron: '29 16,18,20,22,0,2,4 * * *'
-    - cron: '47 15,18,21,0,3 * * *'
+    # Hora de Mazatlán (UTC−7): de 8:07am a 10:47pm, tres veces por hora.
+    - cron: '7 0-5,15-23 * * *'
+    - cron: '27 0-5,15-23 * * *'
+    - cron: '47 0-5,15-23 * * *'
   workflow_dispatch:
 
 permissions:
