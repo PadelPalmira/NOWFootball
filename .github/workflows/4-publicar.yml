@@ -8,32 +8,38 @@ name: 4. Publicar en Now Football
 # Facebook entre 20 y 40 minutos después, no lo publica de inmediato. Ese es
 # el rato que tienes para verlo o cancelarlo en Meta Business Suite.
 #
-# POR QUÉ HAY TANTOS TURNOS Y A MINUTOS RAROS:
-# el reloj de GitHub es "lo mejor que se pueda", no una garantía. Cuando está
-# cargado avisa tarde o se come el turno, y lo que más se congestiona es la
-# hora en punto y la media hora. Por eso los turnos caen en minutos sueltos
-# (07, 27 y 47) y hay TRES POR HORA: con que llegue uno de los tres, esa
-# hora ya tuvo su oportunidad.
+# POR QUÉ YA CASI NO HAY TURNOS DE RELOJ AQUÍ (cambio de la v1.18):
 #
-# Son tres por hora desde la v1.17, porque el cupo subió a 10 los domingos,
-# lunes y jueves. Diez publicaciones separadas mínimo una hora necesitan que
-# casi cada hora de la ventana (8am a 11pm) tenga un turno que sí llegue.
-# Simulado con el reloj comiéndose la mitad de los turnos:
-#     1 por hora -> 6.4 de 10        2 por hora -> 7.9 de 10
-#     3 por hora -> 9.0 de 10        4 por hora -> 9.5 de 10
-# El cuarto turno casi no agrega y en cambio se come los minutos gratis de
-# GitHub, así que se quedó en tres.
+# El reloj de GitHub no sirve para esto. Medido sobre 10 días en el
+# historial real de Actions: pidiéramos 10, 19 o 45 turnos al día, GitHub
+# entregaba entre 3 y 7, y casi siempre pegados. El 12 de noviembre llegaron
+# tres en CINCO MINUTOS (14:50, 14:52 y 14:55): la primera publicó y las
+# otras dos murieron en el freno de separación mínima. Ese día salió una
+# publicación de diez. Subir el número de turnos no mejoró nada.
 #
-# Despertar no cuesta llamadas a X: si el freno de ritmo dice que no toca,
-# la corrida termina antes de consultar nada.
+# Así que ahora el despertador de verdad es un servicio externo gratuito
+# (cron-job.org) que llama a este workflow a la hora exacta. Mira el LEEME
+# de la v1.18 para la configuración.
+#
+# Los turnos que quedan abajo son solo RED DE SEGURIDAD, por si el servicio
+# externo se cae. Son pocos a propósito: cada despertada cuesta un minuto de
+# los 2,000 gratis al mes.
+#
+# Y además, desde la v1.18 cada despertada deja VARIAS publicaciones
+# programadas en Facebook, no una, para que aunque el bot despierte poco se
+# alcance el cupo del día.
 
 on:
   schedule:
-    # Hora de Mazatlán (UTC−7): de 8:07am a 10:47pm, tres veces por hora.
-    - cron: '7 0-5,15-23 * * *'
-    - cron: '27 0-5,15-23 * * *'
-    - cron: '47 0-5,15-23 * * *'
+    # Red de seguridad: cada 3 horas dentro de la ventana (hora de Mazatlán).
+    - cron: '17 15,18,21,0,3 * * *'
   workflow_dispatch:
+    inputs:
+      manual:
+        description: "Déjalo en true si le estás picando tú al botón"
+        required: false
+        default: "true"
+  # El despertador externo llama por la API con inputs.manual = "false".
 
 permissions:
   contents: write
@@ -65,7 +71,10 @@ jobs:
           # Cuando le picas al botón tú, no se aplica el salto aleatorio de
           # turnos: si no, una prueba manual podría no hacer nada y parecería
           # que está roto. Los demás frenos sí siguen activos.
-          CORRIDA_MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+          # Solo es "manual" cuando le picas tú al botón. El despertador
+          # externo manda manual=false para que se apliquen las reglas
+          # normales de ritmo.
+          CORRIDA_MANUAL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.manual != 'false' }}
         run: python -m bot.post
 
       - name: Guardar el registro
