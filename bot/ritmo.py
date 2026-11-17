@@ -118,11 +118,18 @@ def esperado_a_estas_horas(local, tope):
 
 # ---------------------------------------------------------------- la decisión
 
-def momento_objetivo(ahora, rng):
-    """Cuándo sale la publicación. None = al instante.
+def momento_objetivo(ahora, rng, posted=None):
+    """Cuándo sale la publicación. None = no cabe en la ventana horaria.
 
-    El retraso es corto y aleatorio: desordena la hora (publicar al instante
-    la dejaría clavada en la hora del cron) y da margen para cancelar.
+    Normalmente es dentro de 20 a 40 minutos: desordena la hora (publicar al
+    instante la dejaría clavada en la hora del cron) y da margen para
+    cancelar en Meta Business Suite.
+
+    Si ya hay publicaciones PROGRAMADAS más adelante, la siguiente se coloca
+    después de la última, respetando la separación mínima. Eso es lo que
+    permite dejar varias listas de una sola despertada, que es como se
+    sobrevive a que el reloj de GitHub solo despierte al bot dos o tres
+    veces al día.
     """
     minimo, maximo = config.RETRASO_MINUTOS
     if maximo <= 0:
@@ -130,6 +137,15 @@ def momento_objetivo(ahora, rng):
 
     minutos = rng.randint(max(minimo, 11), max(maximo, 11))
     objetivo = ahora + dt.timedelta(minutes=minutos)
+
+    if posted is not None:
+        futuros = [m for m in momentos_programados(posted) if m > ahora]
+        if futuros:
+            desorden = rng.randint(0, max(getattr(config, "DESORDEN_COLA", 0), 0))
+            despues = (max(futuros)
+                       + dt.timedelta(hours=config.MIN_HORAS_ENTRE_POSTS)
+                       + dt.timedelta(minutes=desorden))
+            objetivo = max(objetivo, despues)
 
     # Que el retraso no empuje la publicación fuera de la ventana horaria
     local = _local(objetivo)
@@ -155,7 +171,7 @@ def decidir(posted, ahora=None, rng=None):
                        f"ver qué pasa. Al publicar bien una vez, el contador se "
                        f"reinicia solo."), None
 
-    objetivo = momento_objetivo(ahora, rng)
+    objetivo = momento_objetivo(ahora, rng, posted)
     local_ahora = _local(ahora)
     if not (config.VENTANA_INICIO <= local_ahora.hour < config.VENTANA_FIN):
         return False, (f"Fuera de la ventana de publicación "
@@ -163,6 +179,16 @@ def decidir(posted, ahora=None, rng=None):
                        f"hora de Mazatlán)."), None
     if config.RETRASO_MINUTOS[1] > 0 and objetivo is None:
         return False, "El retraso dejaría la publicación fuera de la ventana horaria.", None
+
+    # No programar demasiado lejos: lo que se programa a muchas horas se
+    # eligió con las noticias de ahora, y para cuando salga ya estaría viejo.
+    horizonte = getattr(config, "HORIZONTE_HORAS", 0) or 0
+    if horizonte:
+        adelanto = (objetivo - ahora).total_seconds() / 3600.0
+        if adelanto > horizonte:
+            return False, (f"El siguiente hueco libre cae dentro de {adelanto:.1f} h "
+                           f"y solo se programa hasta {horizonte:.0f} h por "
+                           f"delante, para no publicar noticias viejas."), None
     fecha = _local(objetivo or ahora).date()
 
     tope, nota = tope_de_hoy(posted, ahora, fecha)

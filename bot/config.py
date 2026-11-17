@@ -150,6 +150,21 @@ MIN_MUESTRA_BASE = 3
 # el peor caso fue 194 contra 9,149.
 FACTOR_RESCATE = 2.0        # "mucho mejor" = el doble de bueno
 
+# --- Programar varias de una sola despertada (v1.18) ---------------------
+# El reloj de GitHub solo despierta al bot 2 o 3 veces al día, y encima las
+# despertadas llegan pegadas (el 12 de noviembre llegaron tres en cinco
+# minutos y dos murieron en el freno de separación mínima: ese día salió UNA
+# publicación de diez). Como no podemos controlar cuándo nos despierta, cada
+# despertada deja varias publicaciones PROGRAMADAS en Facebook a horas
+# separadas. El programador de Facebook sí es puntual.
+#
+# HORIZONTE_HORAS limita qué tan lejos se programa. Mientras más lejos, más
+# seguro se llena el cupo, pero el contenido sale más viejo: una publicación
+# programada a 6 horas se eligió con las noticias de hace 6 horas.
+HORIZONTE_HORAS  = 2.0   # no se programa nada más allá de esto
+MAX_POR_CORRIDA  = 4     # tope duro de publicaciones por despertada
+DESORDEN_COLA    = 25    # minutos de desorden entre una programada y la siguiente
+
 EDAD_MINIMA_HORAS = 0.5
 
 # ---------- Lienzo ----------

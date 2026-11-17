@@ -48,51 +48,16 @@ def _ultima_cuenta(posted):
     return None
 
 
-def run(dry_run=False, ahora=None, rng=None):
-    queue = store.load_queue()
-    posted = store.load_posted()
-    usados = store.posted_ids(posted)
-    bloqueados = _cargar_bloqueados()
-    rng = rng or random
-    ahora = ahora or dt.datetime.now(dt.timezone.utc)
-    sin_datos_frescos = False
+def _intentar_una(queue, posted, usados, bloqueados, momento, ahora, rng,
+                  tmpdir, dry_run):
+    """Elige el mejor candidato y lo publica o lo deja programado.
 
-    # ---------- Frenos de ritmo (no aplican a la prueba sin publicar)
-    if not dry_run:
-        adelante, razon, momento = ritmo.decidir(posted, ahora, rng)
-        print(f"Ritmo: {razon}\n")
-        if not adelante:
-            return 0
-    else:
-        momento = ritmo.momento_objetivo(ahora, rng)
-
-    # ---------- Datos frescos de X
-    # Se consulta justo ahora, no se usa lo que hubiera guardado de antes:
-    # buscamos lo mejor de las últimas 2 horas y eso cambia minuto a minuto.
-    if not dry_run or config.REFRESCAR_EN_PRUEBA:
-        print("Consultando X...")
-        queue, nuevos, _, errores = collect.refrescar(queue, ahora)
-        queue = collect.limpiar(queue, ahora)
-        store.save_queue(queue)
-        if errores:
-            fallidas = ", ".join("@" + c for c, _ in errores)
-            print(f"  [!] No respondieron: {fallidas}")
-        sin_datos_frescos = len(errores) == len(config.ACCOUNTS)
-        if sin_datos_frescos:
-            print("  [!] Ninguna cuenta de X respondió. Se intenta con lo que ya")
-            print("      estaba guardado, que puede tener los números algo atrasados.")
-        print(f"  {nuevos} publicaciones nuevas · {len(queue)} en total\n")
-
-    # ---------- Elegir candidato: ventana más reciente que tenga algo
+    Devuelve uno de: "ok", "nada", "prueba", "fallo".
+    """
     ranking, ventana = scoring.rank_por_ventana(queue, usados, ahora)
     if not ranking:
-        print(f"Nada publicable en las últimas {config.VENTANAS_HORAS[-1]} horas.")
-        print("Puede ser que las cuentas no hayan publicado imágenes nuevas,")
-        print("o que todo lo reciente ya se haya publicado antes.")
-        if sin_datos_frescos:
-            print("\nOJO: además X no respondió en esta corrida.", file=sys.stderr)
-            return 1
-        return 0
+        return "nada"
+
     print(f"Ventana usada: últimas {ventana} h · {len(ranking)} candidatos")
     if ventana != config.VENTANAS_HORAS[0]:
         print(f"  (no había nada en las últimas {config.VENTANAS_HORAS[0]} h, "
@@ -103,10 +68,9 @@ def run(dry_run=False, ahora=None, rng=None):
         otras = [(s, t) for s, t in ranking if t["author"] != anterior]
         if otras:
             ranking = otras + [(s, t) for s, t in ranking if t["author"] == anterior]
-            print(f"El post anterior fue de @{anterior}; se prefiere otra cuenta.\n")
+            print(f"La anterior fue de @{anterior}; se prefiere otra cuenta.")
 
     print("\nProbando los mejores:\n")
-    tmpdir = tempfile.mkdtemp(prefix="nfb_")
 
     for score, tweet in ranking[:MAX_INTENTOS]:
         horas = scoring.age_hours(tweet, ahora)
@@ -169,7 +133,7 @@ def run(dry_run=False, ahora=None, rng=None):
             print("\n--- PRUEBA: no se publicó nada en Facebook ---")
             print(f"Saldría: {cuando}")
             print(f"Texto que llevaría:\n{texto}\n")
-            return 0
+            return "prueba"
 
         try:
             resp = facebook.post_photo(destino, texto, publicar_en=momento)
@@ -179,7 +143,7 @@ def run(dry_run=False, ahora=None, rng=None):
             print(f"    [!] Falló la publicación: {e}", file=sys.stderr)
             print(f"    Fallos seguidos: {posted['fallos_seguidos']} de "
                   f"{config.MAX_FALLOS_SEGUIDOS}", file=sys.stderr)
-            return 1
+            return "fallo"
 
         posted["fallos_seguidos"] = 0
         posted["items"].append({
@@ -197,21 +161,118 @@ def run(dry_run=False, ahora=None, rng=None):
             "publica_en": resp.get("publica_en"),
             "at": ahora.isoformat(),
         })
+        usados.add(tweet["id"])
         store.save_posted(posted)
 
         if resp.get("modo") == "programado":
             local = momento.astimezone(config.TZ)
             print(f"\n✅ PROGRAMADO para el {local.strftime('%d/%m a las %H:%M')} "
                   f"(hora de Mazatlán) · {etiqueta}")
-            print("   Puedes revisarlo o cancelarlo en Meta Business Suite,")
-            print("   en la sección de publicaciones programadas.")
         else:
             print(f"\n✅ Publicado en Now Football ({etiqueta})")
         print(f"   ID de Facebook: {resp.get('post_id')}")
-        return 0
+        return "ok"
 
-    store.save_posted(posted)
-    print("Probé los mejores candidatos y ninguno sirvió en esta corrida.")
+    return "nada"
+
+
+def run(dry_run=False, ahora=None, rng=None):
+    """Una despertada del bot.
+
+    Desde la v1.18 una despertada puede dejar VARIAS publicaciones
+    programadas, no una. El motivo está medido: el reloj de GitHub solo
+    despierta al bot dos o tres veces al día y además las despertadas llegan
+    pegadas. El 12 de noviembre llegaron tres en cinco minutos; la primera
+    publicó y las otras dos murieron en el freno de separación mínima. Ese
+    día salió UNA publicación de diez.
+
+    Como no se puede controlar cuándo despierta GitHub, cada despertada deja
+    programado lo que quepa dentro de HORIZONTE_HORAS, separado como debe
+    ser. El programador de Facebook sí es puntual.
+    """
+    queue = store.load_queue()
+    posted = store.load_posted()
+    usados = store.posted_ids(posted)
+    bloqueados = _cargar_bloqueados()
+    rng = rng or random
+    ahora = ahora or dt.datetime.now(dt.timezone.utc)
+    sin_datos_frescos = False
+
+    # ---------- Freno de ritmo, antes de gastar una sola llamada a X
+    if not dry_run:
+        adelante, razon, momento = ritmo.decidir(posted, ahora, rng)
+        print(f"Ritmo: {razon}\n")
+        if not adelante:
+            return 0
+    else:
+        momento = ritmo.momento_objetivo(ahora, rng, posted)
+
+    # ---------- Datos frescos de X
+    # Se consulta justo ahora, no se usa lo que hubiera guardado de antes:
+    # buscamos lo mejor de la última hora y eso cambia minuto a minuto.
+    if not dry_run or config.REFRESCAR_EN_PRUEBA:
+        print("Consultando X...")
+        queue, nuevos, _, errores = collect.refrescar(queue, ahora)
+        queue = collect.limpiar(queue, ahora)
+        store.save_queue(queue)
+        if errores:
+            fallidas = ", ".join("@" + c for c, _ in errores)
+            print(f"  [!] No respondieron: {fallidas}")
+        sin_datos_frescos = len(errores) == len(config.ACCOUNTS)
+        if sin_datos_frescos:
+            print("  [!] Ninguna cuenta de X respondió. Se intenta con lo que ya")
+            print("      estaba guardado, que puede tener los números algo atrasados.")
+        print(f"  {nuevos} publicaciones nuevas · {len(queue)} en total\n")
+
+    tmpdir = tempfile.mkdtemp(prefix="nfb_")
+    tope = max(int(getattr(config, "MAX_POR_CORRIDA", 1)), 1)
+    hechas = 0
+
+    while True:
+        estado = _intentar_una(queue, posted, usados, bloqueados, momento,
+                               ahora, rng, tmpdir, dry_run)
+
+        if estado == "prueba":
+            return 0
+        if estado == "fallo":
+            return 1
+        if estado == "nada":
+            if hechas == 0:
+                print(f"Nada publicable en las últimas "
+                      f"{config.VENTANAS_HORAS[-1]} horas.")
+                print("Puede ser que las cuentas no hayan publicado imágenes")
+                print("nuevas, o que todo lo reciente ya se haya publicado.")
+                store.save_posted(posted)
+                if sin_datos_frescos:
+                    print("\nOJO: además X no respondió en esta corrida.",
+                          file=sys.stderr)
+                    return 1
+            else:
+                print("\nYa no quedan candidatos nuevos para programar otra.")
+            break
+
+        hechas += 1
+        if hechas >= tope:
+            print(f"\nTope de {tope} publicaciones por despertada.")
+            break
+
+        # ¿Cabe otra dentro del horizonte? decidir() ya toma en cuenta las que
+        # se acaban de programar, así que la coloca después de la última.
+        adelante, razon, momento = ritmo.decidir(posted, ahora, rng)
+        if not adelante:
+            print(f"\nNo cabe otra: {razon}")
+            break
+
+    if hechas:
+        futuras = [m for m in ritmo.momentos_programados(posted) if m > ahora]
+        print(f"\n{'='*58}")
+        print(f"Esta despertada dejó {hechas} publicación(es) lista(s).")
+        if futuras:
+            horas = ", ".join(m.astimezone(config.TZ).strftime("%H:%M")
+                              for m in sorted(futuras))
+            print(f"Programadas en Facebook para las: {horas} (hora de Mazatlán)")
+        print("Puedes revisarlas o cancelarlas en Meta Business Suite,")
+        print("en la sección de publicaciones programadas.")
     return 0
 
 
