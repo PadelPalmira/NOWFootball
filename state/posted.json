@@ -540,6 +540,21 @@
       "tasa": 16.6,
       "tweet_url": "https://x.com/NFL_Stats/status/2122813279454343419",
       "ventana_h": 2
+    },
+    {
+      "at": "2026-11-18T01:00:21.830903+00:00",
+      "author": "SleeperNFL",
+      "fb_post_id": "100393491469174_1527156372804254",
+      "id": "2122822562950566130",
+      "image_url": "https://pbs.twimg.com/media/HXXH3xsa4AAP6UE.jpg?format=jpg&name=large",
+      "modo": "programado",
+      "phash": "12791c4bedf19309",
+      "publica_en": "2026-11-18T02:40:56.422234+00:00",
+      "retweets": 1,
+      "score": 1.979,
+      "tasa": 20.4,
+      "tweet_url": "https://x.com/SleeperNFL/status/2122822562950566130",
+      "ventana_h": 4
     }
   ]
 }
