@@ -1050,6 +1050,21 @@
       "tasa": 711.4,
       "tweet_url": "https://x.com/SleeperNFL/status/2124580769511489958",
       "ventana_h": 1
+    },
+    {
+      "at": "2026-11-22T21:06:09.035141+00:00",
+      "author": "NFL_DovKleiman",
+      "fb_post_id": "100393491469174_1532143602305531",
+      "id": "2124606595053056359",
+      "image_url": "https://pbs.twimg.com/media/HXwdqP-XwAE6aDQ.jpg?format=jpg&name=large",
+      "modo": "programado",
+      "phash": "40e8d3e2cdfa0f05",
+      "publica_en": "2026-11-22T21:43:09.035141+00:00",
+      "retweets": 6,
+      "score": 2.81,
+      "tasa": 184.0,
+      "tweet_url": "https://x.com/NFL_DovKleiman/status/2124606595053056359",
+      "ventana_h": 1
     }
   ]
 }
