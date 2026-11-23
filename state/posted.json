@@ -1133,6 +1133,14 @@
       "tasa": 150.0,
       "tweet_url": "https://x.com/SleeperNFL/status/2124680931432857600",
       "ventana_h": 1
+    },
+    {
+      "at": "2026-11-23T05:00:26.176847+00:00",
+      "author": "SleeperNFL",
+      "id": "2124718229369274443",
+      "image_url": "https://pbs.twimg.com/media/HXyD-ClaUAAYWCU.jpg?format=jpg&name=large",
+      "phash": "50d8092fe6c6362f",
+      "skipped": "duplicada"
     }
   ]
 }
