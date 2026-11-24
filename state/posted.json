@@ -1231,6 +1231,36 @@
       "tasa": 3009.6,
       "tweet_url": "https://x.com/AdamSchefter/status/2124960062611362039",
       "ventana_h": 1
+    },
+    {
+      "at": "2026-11-24T00:00:36.815777+00:00",
+      "author": "NFL_Stats",
+      "fb_post_id": "100393491469174_1533306738855884",
+      "id": "2124972003308290168",
+      "image_url": "https://pbs.twimg.com/media/HX0eqM-WgAAPiIe.jpg?format=jpg&name=large",
+      "modo": "programado",
+      "phash": "0ed1a1729cb4d8cd",
+      "publica_en": "2026-11-24T00:33:36.815777+00:00",
+      "retweets": 4,
+      "score": 6.039,
+      "tasa": 25.0,
+      "tweet_url": "https://x.com/NFL_Stats/status/2124972003308290168",
+      "ventana_h": 4
+    },
+    {
+      "at": "2026-11-24T00:00:36.815777+00:00",
+      "author": "AdamSchefter",
+      "fb_post_id": "100393491469174_1533306822189209",
+      "id": "2124967303091482818",
+      "image_url": "https://pbs.twimg.com/media/HX1mf74XYAAJGbM.jpg?format=jpg&name=large",
+      "modo": "programado",
+      "phash": "1fbda2921f821d64",
+      "publica_en": "2026-11-24T01:33:36.815777+00:00",
+      "retweets": 352,
+      "score": 1.842,
+      "tasa": 1818.4,
+      "tweet_url": "https://x.com/AdamSchefter/status/2124967303091482818",
+      "ventana_h": 4
     }
   ]
 }
