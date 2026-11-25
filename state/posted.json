@@ -1411,6 +1411,21 @@
       "tasa": 477.1,
       "tweet_url": "https://x.com/NFL_DovKleiman/status/2125402572118691845",
       "ventana_h": 24
+    },
+    {
+      "at": "2026-11-25T19:00:24.666795+00:00",
+      "author": "AdamSchefter",
+      "fb_post_id": "100393491469174_1535298971989994",
+      "id": "2125655337848209439",
+      "image_url": "https://pbs.twimg.com/media/HX_YQ5RWcAAlmws.jpg?format=jpg&name=large",
+      "modo": "programado",
+      "phash": "04aec01b99d56fc6",
+      "publica_en": "2026-11-25T19:27:24.666795+00:00",
+      "retweets": 1479,
+      "score": 48.985,
+      "tasa": 21524.5,
+      "tweet_url": "https://x.com/AdamSchefter/status/2125655337848209439",
+      "ventana_h": 1
     }
   ]
 }
