@@ -1524,6 +1524,36 @@
       "tasa": 54.4,
       "tweet_url": "https://x.com/SleeperNFL/status/2125985078282993826",
       "ventana_h": 1
+    },
+    {
+      "at": "2026-11-26T20:00:21.609420+00:00",
+      "author": "SleeperNFL",
+      "fb_post_id": "100393491469174_1536446345208590",
+      "id": "2126030753922523425",
+      "image_url": "https://pbs.twimg.com/media/HYEttEcbgAAT_wU.jpg?format=jpg&name=large",
+      "modo": "programado",
+      "phash": "0ce37490052f3b6f",
+      "publica_en": "2026-11-26T20:20:21.609420+00:00",
+      "retweets": 6,
+      "score": 21.754,
+      "tasa": 370.1,
+      "tweet_url": "https://x.com/SleeperNFL/status/2126030753922523425",
+      "ventana_h": 1
+    },
+    {
+      "at": "2026-11-26T20:00:21.609420+00:00",
+      "author": "SleeperNFL",
+      "fb_post_id": "100393491469174_1536446411875250",
+      "id": "2126037202438443189",
+      "image_url": "https://pbs.twimg.com/media/HYEzkZCbIAAns4b.jpg?format=jpg&name=large",
+      "modo": "programado",
+      "phash": "50d01c1ecfee2e2a",
+      "publica_en": "2026-11-26T21:41:21.609420+00:00",
+      "retweets": 2,
+      "score": 10.581,
+      "tasa": 180.0,
+      "tweet_url": "https://x.com/SleeperNFL/status/2126037202438443189",
+      "ventana_h": 1
     }
   ]
 }
