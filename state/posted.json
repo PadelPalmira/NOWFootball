@@ -1554,6 +1554,21 @@
       "tasa": 180.0,
       "tweet_url": "https://x.com/SleeperNFL/status/2126037202438443189",
       "ventana_h": 1
+    },
+    {
+      "at": "2026-11-26T23:00:26.893602+00:00",
+      "author": "AdamSchefter",
+      "fb_post_id": "100393491469174_1536567828529775",
+      "id": "2126072237640052819",
+      "image_url": "https://pbs.twimg.com/media/HYFTbqZWwAAc6T_.jpg?format=jpg&name=large",
+      "modo": "programado",
+      "phash": "3f1f97e0c0e0e069",
+      "publica_en": "2026-11-26T23:32:26.893602+00:00",
+      "retweets": 193,
+      "score": 210.883,
+      "tasa": 3741.1,
+      "tweet_url": "https://x.com/AdamSchefter/status/2126072237640052819",
+      "ventana_h": 2
     }
   ]
 }
