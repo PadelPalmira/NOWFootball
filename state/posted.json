@@ -1659,6 +1659,36 @@
       "tasa": 69.4,
       "tweet_url": "https://x.com/SleeperNFL/status/2126127335162470721",
       "ventana_h": 24
+    },
+    {
+      "at": "2026-11-27T20:00:29.617478+00:00",
+      "author": "AdamSchefter",
+      "fb_post_id": "100393491469174_1537558071764084",
+      "id": "2126362740960723037",
+      "image_url": "https://pbs.twimg.com/media/HYJbpOKWkAAL3q3.jpg?format=jpg&name=large",
+      "modo": "programado",
+      "phash": "0aab4a2ea4d47b87",
+      "publica_en": "2026-11-27T20:22:29.617478+00:00",
+      "retweets": 952,
+      "score": 3.686,
+      "tasa": 5008.0,
+      "tweet_url": "https://x.com/AdamSchefter/status/2126362740960723037",
+      "ventana_h": 4
+    },
+    {
+      "at": "2026-11-27T20:00:29.617478+00:00",
+      "author": "NFL_Stats",
+      "fb_post_id": "100393491469174_1537558185097406",
+      "id": "2126377010876518775",
+      "image_url": "https://pbs.twimg.com/media/HX6CU8xXEAAZXZM.jpg?format=jpg&name=large",
+      "modo": "programado",
+      "phash": "55364e8db921962d",
+      "publica_en": "2026-11-27T21:47:29.617478+00:00",
+      "retweets": 7,
+      "score": 0.922,
+      "tasa": 14.1,
+      "tweet_url": "https://x.com/NFL_Stats/status/2126377010876518775",
+      "ventana_h": 2
     }
   ]
 }
