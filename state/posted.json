@@ -1719,6 +1719,21 @@
       "tasa": 286.0,
       "tweet_url": "https://x.com/AdamSchefter/status/2126496334630846893",
       "ventana_h": 2
+    },
+    {
+      "at": "2026-11-28T15:00:25.180602+00:00",
+      "author": "NFL_Stats",
+      "fb_post_id": "100393491469174_1538412018345356",
+      "id": "2126449439774773406",
+      "image_url": "https://pbs.twimg.com/media/HYKqeTwXoAA3KPT.jpg?format=jpg&name=large",
+      "modo": "programado",
+      "phash": "0374b800bd2fea9d",
+      "publica_en": "2026-11-28T15:24:25.180602+00:00",
+      "retweets": 78,
+      "score": 7.157,
+      "tasa": 45.8,
+      "tweet_url": "https://x.com/NFL_Stats/status/2126449439774773406",
+      "ventana_h": 24
     }
   ]
 }
